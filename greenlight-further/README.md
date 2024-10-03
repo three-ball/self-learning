@@ -196,3 +196,11 @@ func (app *application) exampleHandler(w http.ResponseWriter, r *http.Request) {
 
 - ***Tradeoff:*** using the request context as the parent context for database timeouts **adds quite a lot of behavioral complexity** and introduces nuances that **you and anyone else working on the codebase needs to be aware of**.
 - For most applications, on most endpoints, it’s probably not. The exceptions are probably applications which frequently run close to saturation point of their resources, or for specific endpoints which execute slow running or very computationally expensive SQL queries. In those cases, canceling queries aggressively when a client disappears may have a meaningful positive impact and make it worth the trade-off.
+
+### Parsing Query String Parameter
+
+> please return the **first 5 records** where the movie **name includes godfather** and the genresinclude **crime and drama**,sorted by **descending release year**
+
+```bash
+/v1/movies?title=godfather&genres=crime,drama&page=1&page_size=5&sort=-year
+```

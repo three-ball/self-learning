@@ -18,6 +18,9 @@
 		- [Sorting lists](#sorting-lists)
 		- [Paginating Lists](#paginating-lists)
 		- [Returning Pagination Metadata](#returning-pagination-metadata)
+	- [Structured JSON Log Entries](#structured-json-log-entries)
+	- [Rate Limiting](#rate-limiting)
+		- [Global Rate Limiting](#global-rate-limiting)
 
 
 ## Project structure
@@ -380,5 +383,90 @@ func calculateMetadata(totalRecords, page, pageSize int) Metadata {
 		LastPage:     int(math.Ceil(float64(totalRecords) / float64(pageSize))),
 		TotalRecords: totalRecords,
 	}
+}
+```
+## Structured JSON Log Entries
+
+| Key       	| Description       |
+|----------------|----------------|
+| Level  		| A code indicating the severity of the log entry. In this project we will use the following three severity levels, ordered from least to most severe: <br>  - `INFO` (least severe) <br> - `ERROR` <br> - `FATAL` (most severe)  |
+| Time  		| The UTC time that the log entry was made with second precision.  |
+| Message  		| A string containing the free-text information or error message.  |
+| Properties  	| Any additional information relevant to the log entry in string key/value pairs  |
+| Trace  		| A stack trace for debugging purposes (optional). |
+
+## Rate Limiting
+
+### Global Rate Limiting
+
+```bash
+go get golang.org/x/time/rate@latest
+```
+
+> A Limiter controls how frequently events are allowed to happen. It implements a ***“token bucket”*** ofsize `b`, ***initially full and refilled at rate r tokens persecond***.
+
+- We should **limiter per client** (one client bad action can't effect to another).
+- Using Map to store client limiter, but **our clients will grow up, so we should add clean up job**.
+- Map will be used in concurrent routines, we should you `mutext` to avoid racing condition.
+- If your infrastructure is distributed, with **your application running on multiple servers behind a load balancer, then you'll need to use an alternative approach**.
+- We can use function of HAProxy, Nginx or cache database like Redis.
+
+```Go
+func (app *application) rateLimit(next http.Handler) http.Handler {
+	// maximum is 4 requests
+	// restore 2 requests per second
+
+	type client struct {
+		limiter  *rate.Limiter
+		lastSeen time.Time
+	}
+
+	var (
+		mu      sync.Mutex
+		clients = make(map[string]*client)
+	)
+
+	go func() {
+		for {
+			time.Sleep(time.Minute)
+			// Lock the mutex to prevent any rate limiter checks from happening while
+			// the cleanup is taking place.
+			mu.Lock()
+			// Loop through all clients. If they haven't been seen within the last three
+			// minutes, delete the corresponding entry from the map.
+			for ip, client := range clients {
+				if time.Since(client.lastSeen) > 3*time.Minute {
+					delete(clients, ip)
+				}
+			}
+			// Importantly, unlock the mutex when the cleanup is complete.
+			mu.Unlock()
+		}
+	}()
+
+	return http.HandlerFunc(
+		func(w http.ResponseWriter, r *http.Request) {
+			// Extract the client's IP address from the request.
+			ip, _, err := net.SplitHostPort(r.RemoteAddr)
+			if err != nil {
+				app.serverErrorResponse(w, r, err)
+				return
+			}
+			// Lock the mutex to prevent this code from being executed concurrently.
+			mu.Lock()
+			// Check to see if the IP address already exists in the map. If it doesn't, then
+			// initialize a new rate limiter and add the IP address and limiter to the map.
+			if _, found := clients[ip]; !found {
+				clients[ip].limiter = rate.NewLimiter(2, 4)
+			}
+
+			if !clients[ip].limiter.Allow() {
+				mu.Unlock()
+				app.rateLimitExceededResponse(w, r)
+				return
+			}
+			mu.Unlock()
+			next.ServeHTTP(w, r)
+		})
 }
 ```

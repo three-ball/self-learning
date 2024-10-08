@@ -4,11 +4,8 @@ import (
 	"context"
 	"database/sql"
 	"flag"
-	"fmt"
 	"greenlight-further/internal/jsonlog"
 	"greenlight-further/internal/model"
-	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -97,25 +94,8 @@ func main() {
 		models: model.NewModels(db),
 	}
 
-	router := app.routes()
-
-	srv := &http.Server{
-		Addr:         fmt.Sprintf(":%d", cfg.port),
-		Handler:      router,
-		IdleTimeout:  time.Minute,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 30 * time.Second,
-		ErrorLog:     log.New(logger, "", 0),
-	}
-
-	// Start the HTTP server.
-	logger.PrintInfo("starting server", map[string]string{
-		"version": version,
-		"addr":    srv.Addr,
-		"env":     cfg.env,
-	})
-
-	err = srv.ListenAndServe()
+	// Call app.serve() to start the server.
+	err = app.serve()
 	if err != nil {
 		logger.PrintFatal(err, nil)
 	}

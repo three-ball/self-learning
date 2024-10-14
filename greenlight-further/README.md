@@ -22,6 +22,7 @@
 	- [Rate Limiting](#rate-limiting)
 		- [Global Rate Limiting](#global-rate-limiting)
 	- [Graceful Shutdown](#graceful-shutdown)
+	- [User Model Setup and Registration](#user-model-setup-and-registration)
 
 
 ## Project structure
@@ -506,7 +507,7 @@ func (app *application) serve() error {
 		// Use signal.Notify() to listen for incoming SIGINT and SIGTERM signals and
 		// relay them to the quit channel. Any other signals will not be caught by
 		// signal.Notify() and will retain their default behavior.
-		signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+		
 
 		// Read the signal from the quit channel. This code will block until a signal is
 		// received.
@@ -550,3 +551,21 @@ func (app *application) serve() error {
 ```
 
 - At first glance this code might seem a bit complex, but at a high-level what it’s doing can be summarized very simply: when we receive a `SIGINT` or `SIGTERM` signal, we instruct our server to stop accepting any new HTTP requests, and give any in-flight requests a **‘grace period’** of 5 secondsto complete before the application isterminated.
+
+## User Model Setup and Registration
+
+```sql
+CREATE TABLE IF NOT EXISTS users (
+    id bigserial PRIMARY KEY,
+    created_at timestamp(0) with time zone NOT NULL DEFAULT NOW(),
+    name text NOT NULL,
+    email citext UNIQUE NOT NULL,
+    password_hash bytea NOT NULL,
+    activated bool NOT NULL,
+    version integer NOT NULL DEFAULT 1
+);
+```
+
+- `citext` (case-insensitive text): store text data exactly as it is inputted - without changing the case in anyway. But the comparisons against the data are alway case-insensitive... Including lookups on associated indexes.
+- `UNIQUE` combined with `citext` means: t no two rows in the database can have the same email value — even if they have different cases - ***no two usersshould exist with the same email address***.
+- `bytea` (binary string) to store one-way hash of the user's password.

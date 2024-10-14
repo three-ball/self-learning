@@ -115,7 +115,7 @@ func (app *application) updateMovieHandler(w http.ResponseWriter, r *http.Reques
 	// Read the JSON request body data into the input struct.
 	err = app.readJSON(w, r, &input)
 	if err != nil {
-		app.badRequestResponse(w, r)
+		app.badRequestResponse(w, r, err)
 		return
 	}
 	// Copy the values from the request body to the appropriate fields of the movie

@@ -51,7 +51,7 @@ func main() {
 
 	flag.StringVar(&cfg.db.dsn,
 		"db-dsn",
-		"postgres://psql_db:secret@localhost/psql_db?sslmode=disable",
+		"postgres://infras:secret@localhost/infras?sslmode=disable",
 		"PostgreSQL DSN")
 
 	flag.IntVar(

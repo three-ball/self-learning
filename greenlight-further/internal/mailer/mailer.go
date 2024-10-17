@@ -3,7 +3,6 @@ package mailer
 import (
 	"bytes"
 	"embed"
-	"log"
 	"text/template"
 	"time"
 
@@ -72,10 +71,15 @@ func (m Mailer) Send(recipient, templateFile string, data interface{}) error {
 	// opens a connection to the SMTP server, sends the message, then closes the
 	// connection. If there is a timeout, it will return a "dial tcp: i/o timeout"
 	// error.
-	err = m.dialer.DialAndSend(msg)
-	if err != nil {
-		log.Printf("error sending email: %v\n", err)
-		return err
+	for i := 1; i <= 3; i++ {
+		err = m.dialer.DialAndSend(msg)
+		// If everything worked, return nil.
+		if nil == err {
+			return nil
+		}
+		// If it didn't work, sleep for a short time and retry.
+		time.Sleep(500 * time.Millisecond)
 	}
+
 	return nil
 }

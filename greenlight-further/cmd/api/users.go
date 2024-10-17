@@ -59,11 +59,13 @@ func (app *application) registerUserHandler(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	err = app.mailer.Send(user.Email, "user_welcome.html", user)
-	if err != nil {
-		app.serverErrorResponse(w, r, err)
-		return
-	}
+	// Launch a background goroutine to send the welcome email.
+	app.background(func() {
+		err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+		if err != nil {
+			app.logger.PrintError(err, nil)
+		}
+	})
 
 	// Write a JSON response containing the user data along with a 201 Created status
 	// code.

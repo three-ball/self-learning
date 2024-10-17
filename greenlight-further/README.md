@@ -23,6 +23,7 @@
 		- [Global Rate Limiting](#global-rate-limiting)
 	- [Graceful Shutdown](#graceful-shutdown)
 	- [User Model Setup and Registration](#user-model-setup-and-registration)
+	- [Background job](#background-job)
 
 
 ## Project structure
@@ -569,3 +570,51 @@ CREATE TABLE IF NOT EXISTS users (
 - `citext` (case-insensitive text): store text data exactly as it is inputted - without changing the case in anyway. But the comparisons against the data are alway case-insensitive... Including lookups on associated indexes.
 - `UNIQUE` combined with `citext` means: t no two rows in the database can have the same email value — even if they have different cases - ***no two usersshould exist with the same email address***.
 - `bytea` (binary string) to store one-way hash of the user's password.
+
+## Background job
+
+Some important things we should consider when using background job:
+
+- Note that we don't want to use the `app.serverErrorResponse()` helper to handle any errors in our background goroutine, as that would result in us trying to write a second HTTP response
+- The code running in the background goroutine forms a **closure** over the user and app variables. It's important to be aware that these **'closed over'** variables are not scoped to the background goroutine, which means that any changes you make to them will be reflected in the rest of your codebase.
+- Background job should be retried n times to increase the probability that emails are successfully sent.
+
+```Go
+	for i := 1; i <= 3; i++ {
+		err = m.dialer.DialAndSend(msg)
+		// If everything worked, return nil.
+		if nil == err {
+			return nil
+		}
+		// If it didn't work, sleep for a short time and retry.
+		time.Sleep(500 * time.Millisecond)
+	}
+```
+
+- It's important to bear in mind that any panic which happens in this background goroutine
+will not be automatically recovered by our `recoverPanic()` middleware or Go's http.Server.
+
+```Go
+// The background() helper accepts an arbitrary function as a parameter.
+func (app *application) background(fn func()) {
+	// Launch a background goroutine.
+	go func() {
+		// Recover any panic.
+		defer func() {
+			if err := recover(); err != nil {
+				app.logger.PrintError(fmt.Errorf("%s", err), nil)
+			}
+		}()
+		// Execute the arbitrary function that we passed as the parameter.
+		fn()
+	}()
+}
+
+// Using helper to recover panic:
+	app.background(func() {
+		err = app.mailer.Send(user.Email, "user_welcome.tmpl", user)
+		if err != nil {
+			app.logger.PrintError(err, nil)
+		}
+	})
+```

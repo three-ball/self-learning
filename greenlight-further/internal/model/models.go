@@ -3,6 +3,7 @@ package model
 import (
 	"database/sql"
 	"errors"
+	"time"
 )
 
 var (
@@ -22,6 +23,13 @@ type UserRepository interface {
 	Insert(user *User) error
 	GetByEmail(email string) (*User, error)
 	Update(user *User) error
+	GetForToken(tokenScope, tokenPlaintext string) (*User, error)
+}
+
+type TokenRepository interface {
+	New(userID int64, ttl time.Duration, scope string) (*Token, error)
+	Insert(token *Token) error
+	DeleteAllForUser(scope string, userID int64) error
 }
 
 // Create a Models struct which wraps the MovieModel. We'll add other models to this,
@@ -29,6 +37,7 @@ type UserRepository interface {
 type Models struct {
 	Movies MovieRepository
 	Users  UserRepository
+	Tokens TokenRepository
 }
 
 // For ease of use, we also add a New() method which returns a Models struct containing
@@ -37,5 +46,6 @@ func NewModels(db *sql.DB) Models {
 	return Models{
 		Movies: MovieModel{DB: db},
 		Users:  UserModel{DB: db},
+		Tokens: TokenModel{DB: db},
 	}
 }

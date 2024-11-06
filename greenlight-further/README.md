@@ -33,6 +33,9 @@
 			- [API Key authentication](#api-key-authentication)
 			- [OAuth 2.0 / OpenID Connect](#oauth-20--openid-connect)
 			- [What authentication approach should I use?](#what-authentication-approach-should-i-use)
+		- [Authenticating Requests](#authenticating-requests)
+			- [Anonymous User](#anonymous-user)
+			- [Reading and writing to the request context](#reading-and-writing-to-the-request-context)
 
 
 ## Project structure
@@ -708,4 +711,92 @@ func (app *application) background(fn func()) {
   - Stateful authentication tokens are a nice fit for APIs that act as the back-end for a website or single-page application, as there is a natural moment when the user logs in where they can be exchanged for user credentials.
   - In contrast, API keys can be better for more 'general purpose' APIs because they're permanent and simpler for developers to use in their applications and scripts.
 
+### Authenticating Requests
+
+- Essentially, once a client has an authentication token we will expect them to include it with all subsequent requests in an Authorization header, like so:
+
+```bash
+ Authorization: Bearer IEYZQUBEMPPAKPOAWTPV6YJ6RM
+```
+
+-  When we receive these requests, we'll use a new `authenticate()` middleware method to execute the following logic:
+   - If the authentication **token is not valid**, then we will send the client a `401 Unauthorized`.
+   - If the authentication **token is valid**, we will **look up the user details** and add their details to the request context.
+   - If **no Authorization header was provided at all**, then we will add the details for an `anonymous user`.
+
+#### Anonymous User
+
+- Create anonymous user:
+
+```Go
+// Define a custom ErrDuplicateEmail error.
+var (
+	AnonymousUser     = &User{}
+)
+
+type User struct {
+	ID        int64     `json:"id"`
+	CreatedAt time.Time `json:"created_at"`
+	Name      string    `json:"name"`
+	Email     string    `json:"email"`
+	Password  password  `json:"-"`
+	Activated bool      `json:"activated"`
+	Version   int       `json:"-"`
+}
+
+// Check if a User instance is the AnonymousUser.
+func (u *User) IsAnonymous() bool {
+	return u == AnonymousUser
+}
+/*
+	data.AnonymousUser.IsAnonymous() // → Returns true
+
+	otherUser := &data.User{}
+	otherUser.IsAnonymous()          // → Returns false
+*/
+```
+
+####  Reading and writing to the request context
+
+- Every http.Request that our application processes has a context.Context embedded in it, which we can use to store key/value pairs containing arbitrary data during the lifetime of the request.
+- Any values stored in the request context have the type `interface{}`.
+- It's good practice to use your own custom type for the request context keys.
+
+```Go
+package main
+
+import (
+	"context"
+	"greenlight-further/internal/model"
+	"net/http"
+)
+
+// Define a custom contextKey type, with the underlying type string.
+type contextKey string
+
+// Convert the string "user" to a contextKey type and assign it to the userContextKey
+// constant. We'll use this constant as the key for getting and setting user information
+// in the request context.
+const userContextKey = contextKey("user")
+
+// The contextSetUser() method returns a new copy of the request with the provided
+// User struct added to the context. Note that we use our userContextKey constant as the
+// key.
+func (app *application) contextSetUser(r *http.Request, user *model.User) *http.Request {
+	ctx := context.WithValue(r.Context(), userContextKey, user)
+	return r.WithContext(ctx)
+}
+
+// The contextSetUser() retrieves the User struct from the request context. The only
+// time that we'll use this helper is when we logically expect there to be User struct
+// value in the context, and if it doesn't exist it will firmly be an 'unexpected' error.
+// As we discussed earlier in the book, it's OK to panic in those circumstances.
+func (app *application) contextGetUser(r *http.Request) *model.User {
+	user, ok := r.Context().Value(userContextKey).(*model.User)
+	if !ok {
+		panic("missing user value in request context")
+	}
+	return user
+}
+```
 

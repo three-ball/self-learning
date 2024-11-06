@@ -24,6 +24,15 @@
 	- [Graceful Shutdown](#graceful-shutdown)
 	- [User Model Setup and Registration](#user-model-setup-and-registration)
 	- [Background job](#background-job)
+	- [Authentication](#authentication)
+		- [Authentication options](#authentication-options)
+			- [HTTP Basic Authentication](#http-basic-authentication)
+			- [Token authentication](#token-authentication)
+				- [Stateful token authentication](#stateful-token-authentication)
+				- [Stateless token authentication](#stateless-token-authentication)
+			- [API Key authentication](#api-key-authentication)
+			- [OAuth 2.0 / OpenID Connect](#oauth-20--openid-connect)
+			- [What authentication approach should I use?](#what-authentication-approach-should-i-use)
 
 
 ## Project structure
@@ -45,7 +54,7 @@
 
 - The `bin` directory will contain our compiled application binaries, ready for deployment to a production server.
 - The `cmd/api` directory will contain the application-specific code for our Greenlight API application. This will include the code for running the server, reading and writing HTTP requests, and managing authentication.
-- The `internal` directory will contain various ancillary packages used by our API. It will contain the code for interacting with our database, doing data validation, sending emails and so on. Basically, any code which isn’t application-specific and can potentially be reused will live in here. Our Go code under cmd/api will import the packages in the internal directory (but never the other way around).
+- The `internal` directory will contain various ancillary packages used by our API. It will contain the code for interacting with our database, doing data validation, sending emails and so on. Basically, any code which isn't application-specific and can potentially be reused will live in here. Our Go code under cmd/api will import the packages in the internal directory (but never the other way around).
 - The `migrations` directory will contain the SQL migration files for our database.
 - The `remote` directory will contain the configuration files and setup scripts for our production server.
 - The `Makefile` will contain recipes for automating common administrative tasks — like auditing our Go code, building binaries, and executing database migrations
@@ -73,21 +82,21 @@
 ### SetConnMaxLifetime()
 
 - The maximum length of time the a connection can be reused for. Default is no limit life time.
-- If we set ConnMaxLifetime to one hour, for example, it means that all connections will be marked as ‘expired’ one hour after they were first created, and cannot be reused after they’ve expired.
-  - This doesn’t guarantee that a connection will exist in the pool for a whole hour; it’s possible that a connection will become unusable for some reason and be automatically closed before then.
+- If we set ConnMaxLifetime to one hour, for example, it means that all connections will be marked as 'expired' one hour after they were first created, and cannot be reused after they've expired.
+  - This doesn't guarantee that a connection will exist in the pool for a whole hour; it's possible that a connection will become unusable for some reason and be automatically closed before then.
   - A connection can still be in use more than one hour after being created — it just cannot start to be reused after that time.
-  - **This isn’t an idle timeout**. The connection will expire one hour after it was first created — not one hour after it last became idle.
+  - **This isn't an idle timeout**. The connection will expire one hour after it was first created — not one hour after it last became idle.
   - Once every second Go runs a background cleanup operation to remove expired connections from the pool.
 
 ### SetConnMaxIdleTime()
 
-- This works in a very similar way to ConnMaxLifetime , except it sets the maximum length of time that a connection can be idle for before it is marked as expired. By default there’s no limit.
+- This works in a very similar way to ConnMaxLifetime , except it sets the maximum length of time that a connection can be idle for before it is marked as expired. By default there's no limit.
 
 ## Handling Partial Updates
 
 - Difference between:
   - A client providing a key/value pair which has a zero-value value — like `{"title": ""}` — in which case we want to return a validation error.
-  - A client not providing a key/value pair in their JSON at all — in which case we want to ‘skip’ updating the field but not send a validation error.
+  - A client not providing a key/value pair in their JSON at all — in which case we want to 'skip' updating the field but not send a validation error.
 - Using `pointer` for partial update.
 
 ```Go
@@ -216,7 +225,7 @@ func (app *application) exampleHandler(w http.ResponseWriter, r *http.Request) {
 ```
 
 - ***Tradeoff:*** using the request context as the parent context for database timeouts **adds quite a lot of behavioral complexity** and introduces nuances that **you and anyone else working on the codebase needs to be aware of**.
-- For most applications, on most endpoints, it’s probably not. The exceptions are probably applications which frequently run close to saturation point of their resources, or for specific endpoints which execute slow running or very computationally expensive SQL queries. In those cases, canceling queries aggressively when a client disappears may have a meaningful positive impact and make it worth the trade-off.
+- For most applications, on most endpoints, it's probably not. The exceptions are probably applications which frequently run close to saturation point of their resources, or for specific endpoints which execute slow running or very computationally expensive SQL queries. In those cases, canceling queries aggressively when a client disappears may have a meaningful positive impact and make it worth the trade-off.
 
 ## Query with filter, full-text search and sorting, paging.
 
@@ -238,8 +247,8 @@ AND (genres @> $2 OR $2 = '{}')
 ORDER BY id
 ```
 
-- This SQL query is designed so that each of the filters behaves like it is ‘optional’. For example, the condition `(LOWER(title) = LOWER($1) OR $1 = '')` will evaluate as `true` if the placeholder parameter `$1` is a case-insensitive match for the movie title or the placeholder parameter equals `''`.
-- So this filter condition will essentially be ‘skipped’ when movie title being searched for is the empty string "".
+- This SQL query is designed so that each of the filters behaves like it is 'optional'. For example, the condition `(LOWER(title) = LOWER($1) OR $1 = '')` will evaluate as `true` if the placeholder parameter `$1` is a case-insensitive match for the movie title or the placeholder parameter equals `''`.
+- So this filter condition will essentially be 'skipped' when movie title being searched for is the empty string "".
 
 ### Full-Text Search
 
@@ -551,7 +560,7 @@ func (app *application) serve() error {
 }
 ```
 
-- At first glance this code might seem a bit complex, but at a high-level what it’s doing can be summarized very simply: when we receive a `SIGINT` or `SIGTERM` signal, we instruct our server to stop accepting any new HTTP requests, and give any in-flight requests a **‘grace period’** of 5 secondsto complete before the application isterminated.
+- At first glance this code might seem a bit complex, but at a high-level what it's doing can be summarized very simply: when we receive a `SIGINT` or `SIGTERM` signal, we instruct our server to stop accepting any new HTTP requests, and give any in-flight requests a **'grace period'** of 5 secondsto complete before the application isterminated.
 
 ## User Model Setup and Registration
 
@@ -618,3 +627,85 @@ func (app *application) background(fn func()) {
 		}
 	})
 ```
+
+## Authentication
+
+### Authentication options
+
+- Some of the most common approaches at a high level:
+  - Basic authentication
+  - Stateful token authentication
+  - Stateless token authentication
+  - API key authentication
+  - OAuth 2.0 / OpenID Connect
+
+#### HTTP Basic Authentication
+
+- The client includes an Authorization header with every request containing their credentials. The credentials need to be in the format `username:password` and ***base-64 encoded***. It will look like in the header:
+
+```bash
+ Authorization: Basic YWxpY2VAZXhhbXBsZS5jb206cGE1NXdvcmQ=
+```
+
+- It's often useful in the scenario where your API doesn't have "real" user account but you want a quick and easy way to restrict access.
+- For APIs with "real" user accounts and — in particular — hashed passwords, it's not such a great fit. **Comparing the password provided by a client against a (slow) hashed password is a deliberately costly operation, and when using HTTP basic authentication you need to do that check for every request**.
+
+#### Token authentication
+
+- The client sends a request to your API containing their credentials. The API verifies that the credentials are correct, generates a bearer token which represents the user, and sends it back to the user. It will look like in the header:
+
+```bash
+ Authorization: Bearer <token>
+```
+
+- For APIs where user passwords are hashed this approach is better than basic authentication because it means that the slow password check only has to be done periodically — either when creating a token for the first time or after a token has expired.
+- The downside is that managing tokens can be complicated for clients — they will need to implement the necessary logic for caching tokens, monitoring and managing token expiry,and periodically generating new tokens.
+
+##### Stateful token authentication
+
+- In a stateful token approach, the value of the token is a high-entropy cryptographically secure random string. **This token — or a fast hash of it — is stored server-side in a database, alongside the user ID and an expiry time for the token**.
+- **The big advantage of this is that your API maintains control over the tokens** — it's straightforward to revoke tokens on a per-token or per-user basis by deleting them from the database or marking them as expired.
+- Downsides: **you will need to make a database lookup** to check the user's activation status or retrieve additional information about them anyway.
+
+##### Stateless token authentication
+
+- **Stateless tokens encode the user ID and expiry time in the token itself**. The token is cryptographically signed to prevent tampering and (in some cases) encrypted to prevent the contents being read.
+- There are a few different technologies that you can use:  a `JWT` (JSON Web Token) is probably the most well-known approach, but `PASETO`, `Branca` and `nacl/secretbox` are viable alternatives too.
+- Selling point: **the work to encode and decode the token can be done in memory, and all the information required to identify the user is contained within the token itself**. There's no need to perform a database lookup to find out who a request is coming from.
+- Downsides:  they can't easily be revoked once they are issued.
+- In an emergency, **you could effectively revoke all tokens by changing the secret used for signing your tokens**. Another workaround is to maintain a blocklist of revoked tokens in a database (although that defeats the 'stateless' aspect of having stateless tokens).
+
+>  **Note:** You should generally avoid storing additional information in a stateless token, such as a user's activation status or permissions, and *using that as the basis for authorization checks*. During the lifetime of the token, **the information encoded** into it will potentially become stale and **out-of-sync with the real data in your system**.
+
+- **Must read**: [Critical vulnerabilities in JSON Web Token libraries](https://curity.io/resources/learn/jwt-best-practices/) and [JWT Security Best Practices](https://auth0.com/blog/critical-vulnerabilities-in-json-web-token-libraries/)
+
+#### API Key authentication
+
+-  The idea behind API-key authentication is that a user has a non-expiring secret 'key' associated with their account like:
+
+```bash
+ Authorization: Key <key>
+```
+
+- On one hand, **this is nice for the client as they can use the same key for every request and they don't need to write code to manage tokens or expiry**. On the other hand, the user now has two long-lived secrets to manage which can potentially compromise their account: their password, and their API key.
+
+#### OAuth 2.0 / OpenID Connect
+
+- With this approach, information about your users (and their passwords) is stored by a **third-party identity provider like Google or Facebook rather than yourself**.
+- High level design:
+  - Then you want to authenticate a request, you redirect the user to an **`authentication and consent`** form hosted by the identity provider.
+  - If the user consents, then the identity provider sends your API an authorization code.
+  - Your API then sends the authorization code to another endpoint provided by the identity provider. They verify the authorization code, and if it's valid they will send you a JSON response containing an ID token.
+  - This ID token is itself a JWT. You need to validate and decode this JWT to get the actual user information, which includes things like their email address, name, birth date, timezone etc.
+  - Now that you know who the user is, you can then implement a stateful or stateless authentication token pattern so that you don't have to go through the whole process for every subsequent request.
+
+#### What authentication approach should I use?
+
+- If your API doesn't have 'real' user accounts with slow password hashes, then HTTP basic authentication can be a good — and often overlooked — fit.
+- If you don't want to store user passwords yourself, all your users have accounts with a third-party identity provider that supports OpenID Connect, and your API is the back-end for a website… then use OpenID Connect.
+- If you require delegated authentication, such as when your API has a microservice architecture with different services for performing authentication and performing other tasks, then use stateless authentication tokens.
+- Otherwise use API keys or stateful authentication tokens. In general:
+  - Stateful authentication tokens are a nice fit for APIs that act as the back-end for a website or single-page application, as there is a natural moment when the user logs in where they can be exchanged for user credentials.
+  - In contrast, API keys can be better for more 'general purpose' APIs because they're permanent and simpler for developers to use in their applications and scripts.
+
+

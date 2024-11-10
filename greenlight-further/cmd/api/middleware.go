@@ -6,7 +6,6 @@ import (
 	"fmt"
 	"greenlight-further/internal/model"
 	"greenlight-further/internal/validator"
-	"net"
 	"net/http"
 	"strconv"
 	"strings"
@@ -14,6 +13,7 @@ import (
 	"time"
 
 	"github.com/felixge/httpsnoop"
+	"github.com/tomasen/realip"
 	"golang.org/x/time/rate"
 )
 
@@ -74,35 +74,26 @@ func (app *application) rateLimit(next http.Handler) http.Handler {
 		}
 	}()
 
-	return http.HandlerFunc(
-		func(w http.ResponseWriter, r *http.Request) {
-			// Extract the client's IP address from the request.
-			ip, _, err := net.SplitHostPort(r.RemoteAddr)
-			if err != nil {
-				app.serverErrorResponse(w, r, err)
-				return
-			}
-			// Lock the mutex to prevent this code from being executed concurrently.
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if app.config.limiter.enabled {
+			// Use the realip.FromRequest() function to get the client's real IP address.
+			ip := realip.FromRequest(r)
 			mu.Lock()
-			// Check to see if the IP address already exists in the map. If it doesn't, then
-			// initialize a new rate limiter and add the IP address and limiter to the map.
 			if _, found := clients[ip]; !found {
 				clients[ip] = &client{
-					// Use the requests-per-second and burst values from the config
-					// struct.
 					limiter: rate.NewLimiter(rate.Limit(app.config.limiter.rps), app.config.limiter.burst),
 				}
 			}
 			clients[ip].lastSeen = time.Now()
-
 			if !clients[ip].limiter.Allow() {
 				mu.Unlock()
 				app.rateLimitExceededResponse(w, r)
 				return
 			}
 			mu.Unlock()
-			next.ServeHTTP(w, r)
-		})
+		}
+		next.ServeHTTP(w, r)
+	})
 }
 
 func (app *application) authenticate(next http.Handler) http.Handler {

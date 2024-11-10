@@ -40,6 +40,9 @@
 	- [Building, Versioning and Quality Control](#building-versioning-and-quality-control)
 		- [Building using Makefile](#building-using-makefile)
 		- [Quality Controlling Code](#quality-controlling-code)
+		- [Module Proxies and Vendoring](#module-proxies-and-vendoring)
+			- [Module Proxies](#module-proxies)
+			- [Vendoring](#vendoring)
 
 
 ## Project structure
@@ -936,3 +939,35 @@ db/migration/up: confirm
 ```bash
 go install honnef.co/go/tools/cmd/staticcheck@latest
 ```
+
+### Module Proxies and Vendoring
+
+#### Module Proxies
+
+- In version `1.13`, Go began to support *module proxies* (also known as module mirrors) by default. These are services which mirror source code from the original, authoritative, repositories.
+
+```bash
+> go env | grep GOPROXY
+GOPROXY='https://proxy.golang.org,direct'
+```
+
+- Whenever you fetch a package using the go command — either with go get or one of the go mod * commands — it will first attempt to retrieve the source code from this mirror.
+- If the mirror already has a stored copy of the source code for the required package and version number, then it will return this code immediately in a zip file.
+- Otherwise, if it's not already stored, then the mirror will attempt to fetch the code from the authoritative repository, proxy it onwards to you, and store it for future use.
+- But if you don't want to use the module mirror provided by Google, or you're behind a firewall that blocks it, there are other alternatives like **https://goproxy.io** and the Microsoft-provided **https://athens.azurefd.net** that you can try instead.
+
+```bash
+$ export GOPROXY=https://goproxy.io,https://proxy.golang.org,direct # add another src
+$ export GOPROXY=direct #using direct src
+ ```
+
+#### Vendoring
+
+- Go's module mirror functionality is great, and I recommend using it. But it isn't a silver bullet for all developers and all projects.
+- For example, perhaps you don't want to use a module mirror provided by Google or another third-party, but you also don't want the overhead of hosting your own mirror. Or maybe you need to routinely work in an environment without network access...
+- Vendoring dependencies in this way basically stores a complete copy of the source code for third-party packages in a vendor folder in your project.
+
+```bash
+go mod vendor 
+```
+

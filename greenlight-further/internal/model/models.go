@@ -32,20 +32,27 @@ type TokenRepository interface {
 	DeleteAllForUser(scope string, userID int64) error
 }
 
+type PermissionRepository interface {
+	GetAllForUser(userID int64) (Permissions, error)
+	AddForUser(userID int64, codes ...string) error
+}
+
 // Create a Models struct which wraps the MovieModel. We'll add other models to this,
 // like a UserModel and PermissionModel, as our build progresses.
 type Models struct {
-	Movies MovieRepository
-	Users  UserRepository
-	Tokens TokenRepository
+	Movies      MovieRepository
+	Users       UserRepository
+	Tokens      TokenRepository
+	Permissions PermissionRepository
 }
 
 // For ease of use, we also add a New() method which returns a Models struct containing
 // the initialized MovieModel.
 func NewModels(db *sql.DB) Models {
 	return Models{
-		Movies: MovieModel{DB: db},
-		Users:  UserModel{DB: db},
-		Tokens: TokenModel{DB: db},
+		Movies:      MovieModel{DB: db},
+		Users:       UserModel{DB: db},
+		Tokens:      TokenModel{DB: db},
+		Permissions: PermissionModel{DB: db},
 	}
 }

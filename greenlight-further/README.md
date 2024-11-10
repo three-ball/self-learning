@@ -36,6 +36,7 @@
 		- [Authenticating Requests](#authenticating-requests)
 			- [Anonymous User](#anonymous-user)
 			- [Reading and writing to the request context](#reading-and-writing-to-the-request-context)
+	- [Cross Origin Requests](#cross-origin-requests)
 
 
 ## Project structure
@@ -800,3 +801,49 @@ func (app *application) contextGetUser(r *http.Request) *model.User {
 }
 ```
 
+## Cross Origin Requests
+
+- Basically, if two URLs have the same scheme, host and port (if specified) they are said to share the same origin.
+- For example, let’s say that you have a webpage at `https://foo.com` containing some frontend JavaScript code. If this JavaScript tries to make an HTTP request to `https://bar.com/data.json` (a different origin), then the request will be sent and processed by the bar.com server, but the user's web browser will block the response so that the JavaScript code from `https://foo.com` cannot see it.
+- Supporting multiple dynamic origins:
+
+
+```Go
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// Add the "Vary: Origin" header.
+		w.Header().Add("Vary", "Origin")
+		// Get the value of the request's Origin header.
+		origin := r.Header.Get("Origin")
+		// Only run this if there's an Origin request header present AND at least one
+		// trusted origin is configured.
+		if origin != "" && len(app.config.cors.trustedOrigins) != 0 {
+			// Loop through the list of trusted origins, checking to see if the request
+			// origin exactly matches one of them.
+			for i := range app.config.cors.trustedOrigins {
+				if origin == app.config.cors.trustedOrigins[i] {
+					// If there is a match, then set a "Access-Control-Allow-Origin"
+					// response header with the request origin as the value.
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+				}
+			}
+		}
+		// Call the next handler in the chain.
+		next.ServeHTTP(w, r)
+	})
+}
+```
+
+- Broadly speaking, cross-origin requests are classified as 'simple' when all the following conditions are met:
+  - The request HTTP method is one of the three CORS-safe methods: `HEAD`, `GET` or `POST`.
+  - The request headers are all either forbidden headers or one of the four CORS-safe headers:
+    - **Accept**
+    - **Accept-Language**
+    - **Content-Language**
+    - **Content-Type**
+  - The value for the Content-Type header (if set) is one of:
+    - **application/x-www-form-urlencoded**
+    - **multipart/form-data**
+    - **text/plain**
+- **When a cross-origin request doesn't meet these conditions, then the web browser will trigger an initial 'preflight' request before the real request**. The purpose of this preflight request is to determine whether the real cross-origin request will be permitted or not.
+- 

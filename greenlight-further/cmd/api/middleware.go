@@ -162,3 +162,88 @@ func (app *application) authenticate(next http.Handler) http.Handler {
 		next.ServeHTTP(w, r)
 	})
 }
+
+// Checks that a user is both authenticated and activated.
+func (app *application) requireActivatedUser(next http.HandlerFunc) http.HandlerFunc {
+	// Rather than returning this http.HandlerFunc we assign it to the variable fn.
+	fn := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+		// Check that a user is activated.
+		if !user.Activated {
+			app.inactiveAccountResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+	// Wrap fn with the requireAuthenticatedUser() middleware before returning it.
+	return app.requireAuthenticatedUser(fn)
+}
+
+// Create a new requireAuthenticatedUser() middleware to check that a user is not
+// anonymous.
+func (app *application) requireAuthenticatedUser(next http.HandlerFunc) http.HandlerFunc {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		user := app.contextGetUser(r)
+		if user.IsAnonymous() {
+			app.authenticationRequiredResponse(w, r)
+			return
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+// Note that the first parameter for the middleware function is the permission code that
+// we require the user to have.
+func (app *application) requirePermission(code string, next http.HandlerFunc) http.HandlerFunc {
+	fn := func(w http.ResponseWriter, r *http.Request) {
+		// Retrieve the user from the request context.
+		user := app.contextGetUser(r)
+		// Get the slice of permissions for the user.
+		permissions, err := app.models.Permissions.GetAllForUser(user.ID)
+		if err != nil {
+			app.serverErrorResponse(w, r, err)
+			return
+		}
+		// Check if the slice includes the required permission. If it doesn't, then
+		// return a 403 Forbidden response.
+		if !permissions.Include(code) {
+			app.notPermittedResponse(w, r)
+			return
+		}
+		// Otherwise they have the required permission so we call the next handler in
+		// the chain.
+		next.ServeHTTP(w, r)
+	}
+	// Wrap this with the requireActivatedUser() middleware before returning it.
+	return app.requireActivatedUser(fn)
+}
+
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Origin")
+		// Add the "Vary: Access-Control-Request-Method" header.
+		w.Header().Add("Vary", "Access-Control-Request-Method")
+		origin := r.Header.Get("Origin")
+		if origin != "" && len(app.config.cors.trustedOrigins) != 0 {
+			for i := range app.config.cors.trustedOrigins {
+				if origin == app.config.cors.trustedOrigins[i] {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					// Check if the request has the HTTP method OPTIONS and contains the
+					// "Access-Control-Request-Method" header. If it does, then we treat
+					// it as a preflight request.
+					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+						// Set the necessary preflight response headers, as discussed
+						// previously.
+						w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, PUT, PATCH, DELETE")
+						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+						// Write the headers along with a 200 OK status and return from
+						// the middleware with no further action.
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}

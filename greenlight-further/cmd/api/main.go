@@ -3,11 +3,13 @@ package main
 import (
 	"context"
 	"database/sql"
+	"expvar"
 	"flag"
 	"greenlight-further/internal/jsonlog"
 	"greenlight-further/internal/mailer"
 	"greenlight-further/internal/model"
 	"os"
+	"runtime"
 	"strings"
 	"time"
 
@@ -51,6 +53,7 @@ type application struct {
 }
 
 func main() {
+
 	var cfg config
 
 	flag.IntVar(&cfg.port,
@@ -109,6 +112,20 @@ func main() {
 	if err != nil {
 		logger.PrintFatal(err, nil)
 	}
+
+	expvar.NewString("version").Set(version)
+	// Publish the number of active goroutines.
+	expvar.Publish("goroutines", expvar.Func(func() interface{} {
+		return runtime.NumGoroutine()
+	}))
+	// Publish the database connection pool statistics.
+	expvar.Publish("database", expvar.Func(func() interface{} {
+		return db.Stats()
+	}))
+	// Publish the current Unix timestamp.
+	expvar.Publish("timestamp", expvar.Func(func() interface{} {
+		return time.Now().Unix()
+	}))
 
 	defer db.Close()
 	logger.PrintInfo("database connection pool established", nil)

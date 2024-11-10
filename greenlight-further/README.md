@@ -37,6 +37,9 @@
 			- [Anonymous User](#anonymous-user)
 			- [Reading and writing to the request context](#reading-and-writing-to-the-request-context)
 	- [Cross Origin Requests](#cross-origin-requests)
+	- [Building, Versioning and Quality Control](#building-versioning-and-quality-control)
+		- [Building using Makefile](#building-using-makefile)
+		- [Quality Controlling Code](#quality-controlling-code)
 
 
 ## Project structure
@@ -846,4 +849,90 @@ func (app *application) enableCORS(next http.Handler) http.Handler {
     - **multipart/form-data**
     - **text/plain**
 - **When a cross-origin request doesn't meet these conditions, then the web browser will trigger an initial 'preflight' request before the real request**. The purpose of this preflight request is to determine whether the real cross-origin request will be permitted or not.
-- 
+
+```Go
+func (app *application) enableCORS(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Add("Vary", "Origin")
+		// Add the "Vary: Access-Control-Request-Method" header.
+		w.Header().Add("Vary", "Access-Control-Request-Method")
+		origin := r.Header.Get("Origin")
+		if origin != "" && len(app.config.cors.trustedOrigins) != 0 {
+			for i := range app.config.cors.trustedOrigins {
+				if origin == app.config.cors.trustedOrigins[i] {
+					w.Header().Set("Access-Control-Allow-Origin", origin)
+					// Check if the request has the HTTP method OPTIONS and contains the
+					// "Access-Control-Request-Method" header. If it does, then we treat
+					// it as a preflight request.
+					if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+						// Set the necessary preflight response headers, as discussed
+						// previously.
+						w.Header().Set("Access-Control-Allow-Methods", "OPTIONS, PUT, PATCH, DELETE")
+						w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+						// Write the headers along with a 200 OK status and return from
+						// the middleware with no further action.
+						w.WriteHeader(http.StatusOK)
+						return
+					}
+				}
+			}
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+```
+
+## Building, Versioning and Quality Control
+
+### Building using Makefile
+
+```make
+# Include variables from the .envrc file
+include .envrc
+# [namespace]/[action]
+## help: print this help message
+.PHONY: help
+help:
+	@echo 'Usage:'
+	@sed -n 's/^##//p' ${MAKEFILE_LIST} | column -t -s ':' |  sed -e 's/^/ /'
+
+## run/api: run the cmd/api application
+.PHONY: run/api
+run/api:
+	go run ./cmd/api -db-dsn=${GREENLIGHT_DB_DSN}
+
+## db/psql: connect to the database using psql
+.PHONY: confirm
+confirm:
+	@echo -n 'Are you sure? [y/N] ' && read ans && [ $${ans:-N} = y ]
+
+## db/migrations/new name=$1: create a new database migration
+.PHONY: db/psql
+db/psql:
+	psql ${GREENLIGHT_DB_DSN}
+
+## make migration name=create_example_table: create a new database migration
+.PHONY: db/migration/new
+db/migration/new:
+	@echo 'Creating migration files for ${name}...'
+	migrate create -seq -ext=.sql -dir=./migrations ${name}
+
+ ## db/migrations/up: apply all up database migrations
+ .PHONY: db/migration/up
+db/migration/up: confirm
+	@echo 'Running up migrations...'
+	migrate -path ./migrations -database ${GREENLIGHT_DB_DSN} up
+```
+
+### Quality Controlling Code
+
+- Use the `go mod tidy` command to prune any unused dependencies from the **go.mod** and **go.sum** files, and add any missing dependencies.
+- Use the `go mod verify` command to check that the dependencies on your computer. Running this helps ensure that the dependencies being used are the exact ones that you expect.
+- Use the `go fmt ./...` command to format all **.go** files in the project directory, according to the Go standard.
+- Use the `go vet ./...` command to check all **.go** files in the project directory. The go vet tool runs a variety of analyzers which carry out static analysis of your code and warn you about things which might be wrong but won’t be picked up by the compiler — such as unreachable code, unnecessary assignments, and badly-formed build tags.
+- Use the `go test -race -vet=off ./...` command to run all tests in the project directory.
+- Use the third-party `staticcheck` tool to carry out some additional static analysis checks.
+
+```bash
+go install honnef.co/go/tools/cmd/staticcheck@latest
+```

@@ -15,3 +15,8 @@
 ## [2. Design Patterns in Golang](/design-patterns)
 
 - Design Pattern implementation following Viet Tran [youtube tutorial](https://www.youtube.com/watch?v=-eHfGiq9plg&list=PLOsM_3jFFQRmNCt68hxCdxi8i_fUx2wTZ).
+
+## [3. Distributed System](/distributed-system)
+
+- A note for the MIT 6.824 Distributed System course in 2020 - Spring, a free course on YouTube.
+- [MIT 6.824 Distributed System](https://www.youtube.com/watch?v=cQP8WApzIQQ&list=PLrw6a1wE39_tb2fErI4-WkMbsvGQk9_UB&index=1)

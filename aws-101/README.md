@@ -2,6 +2,18 @@
 
 > This repository contains notes about AWS - from zero.
 
+## Table of Contents
+
+- [Compute in the Cloud](#compute-in-the-cloud)
+    - [EC2 - Elastic Compute Cloud](#ec2---elastic-compute-cloud)
+    - [EC2 Auto Scaling](#ec2-auto-scaling)
+    - [Elastic Load Balancing (ELB)](#elastic-load-balancing-elb)
+    - [Amazon Simple Notification Service (SNS) & Amazon Simple Queue Service (SQS)](#amazon-simple-notification-service-sns--amazon-simple-queue-service-sqs)
+    - [AWS Lambda](#aws-lambda)
+    - [Amazon Elastic Container Service (ECS) & Amazon Elastic Kubernetes Service (EKS)](#amazon-elastic-container-service-ecs--amazon-elastic-kubernetes-service-eks)
+    - [AWS Fargate](#aws-fargate)
+    - [Sumary](#sumary)
+
 ## "Compute in the Cloud"
 
 ### EC2 - Elastic Compute Cloud
@@ -68,3 +80,30 @@
 
 - **Amazon Simple Notification Service (Amazon SNS)** is a publish/subscribe service. Using Amazon SNS topics, a publisher publishes messages to subscribers. 
 - **Amazon Simple Queue Service (Amazon SQS)** is a message queuing service. It allows you to decouple and scale microservices, distributed systems, and serverless applications.
+
+### AWS Lambda
+
+- **AWS Lambda** is a serverless compute service that lets you run code without provisioning or managing servers. Lambda runs your code only when needed and scales automatically, from a few requests per day to thousands per second.
+- Lambda supports multiple languages: Node.js, Python, Ruby, Java, Go, .NET Core, and custom runtime.
+- There are 03 main components in Lambda:
+    - **Function**: A piece of code that performs a specific task.
+    - **Event Source**: A Lambda trigger. It can be an S3 bucket, an SNS topic, an SQS queue, or an API Gateway.
+    - **Resource**: The AWS service that triggers the Lambda function.
+
+![alt text](images/lambda.png)
+
+### Amazon Elastic Container Service (ECS) & Amazon Elastic Kubernetes Service (EKS)
+
+- **Amazon Elastic Container Service (ECS)** is a fully managed container orchestration service. ECS supports Docker containers and allows you to easily run and scale containerized applications on AWS.
+- **Amazon Elastic Kubernetes Service (EKS)** is a fully managed Kubernetes service. EKS makes it easy to deploy, manage, and scale containerized applications using Kubernetes on AWS.
+
+### AWS Fargate
+
+- **AWS Fargate** is a serverless compute engine for containers. It works with both `Amazon ECS` and `Amazon EKS`. Fargate removes the need to provision and manage servers, allowing you to focus on building your applications.
+
+### Sumary
+
+- **EC2**: Virtual servers to power your business applications. For full access to the operating system and traditional applications.
+- **AWS Lambda**: Run code without provisioning or managing servers. For event-driven or short-running applications (no infrastructure management).
+- **Amazon ECS & Amazon EKS**: Fully managed container orchestration services.
+- **Fargate**: For serverless container hosting (no EC2 management required).

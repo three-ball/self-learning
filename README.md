@@ -20,3 +20,7 @@
 
 - A note for the MIT 6.824 Distributed System course in 2020 - Spring, a free course on YouTube.
 - [MIT 6.824 Distributed System](https://www.youtube.com/watch?v=cQP8WApzIQQ&list=PLrw6a1wE39_tb2fErI4-WkMbsvGQk9_UB&index=1)
+
+## [4. AWS 101](/aws-101)
+
+- A note for AWS 101 course from CodeGym.

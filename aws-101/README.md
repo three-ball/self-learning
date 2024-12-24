@@ -2,6 +2,10 @@
 
 > This repository contains notes about AWS - from zero.
 
+## Resources
+
+- [AWS Skill Builder](https://explore.skillbuilder.aws/)
+
 ## Table of Contents
 
 - [Compute in the Cloud](#compute-in-the-cloud)
@@ -107,3 +111,47 @@
 - **AWS Lambda**: Run code without provisioning or managing servers. For event-driven or short-running applications (no infrastructure management).
 - **Amazon ECS & Amazon EKS**: Fully managed container orchestration services.
 - **Fargate**: For serverless container hosting (no EC2 management required).
+
+## Global Infrastructure & Reliablity
+
+### Regions
+
+- AWS oprates in different areas globally. Each area is called a `Region`.
+- Each region is a separate geographic area. Each region has multiple, isolated locations known as `Availability Zones`.
+- When determining the right Region for your services:
+    - **Compliance with data governance** and legal requirements. For example, if your company requires all of its data to reside within the boundaries of the UK, you would choose the London Region.
+    - **Proximity to customers**. For example, if your customers are located in Europe, you would choose a Region in Europe.
+    - **Services available in a Region**. Not all services are available in all Regions. For example, Amazon S3 is available in all Regions, but Amazon RDS is not.
+    - **Pricing**. Prices can vary between Regions. For example, the price of an Amazon EC2 instance in the US East (N. Virginia) Region might be different from the price of an Amazon EC2 instance in the Asia Pacific (Tokyo) Region.
+
+### Availability Zones
+
+![alt text](images/azs.png)
+
+- **An Availability Zone** is a single data center or a group of data centers within a Region. Availability Zones are located tens of miles apart from each other. This is close enough to have low latency between Availability Zones, but far enough apart to reduce the risk of a single event affecting all Availability Zones.
+
+### Edge Locations
+
+- **An edge location** is a site that Amazon CloudFront uses to *store cached copies of your content* closer to your customers for faster delivery.
+- AWS uses Amazon CloudFront as its CDNs(Content Delivery Network) service. CloudFront uses a global network of edge locations to cache and deliver content to users with low latency.
+- Edge locations also run Amazon Route 53 - a DNS Servicer that helps direct customers to correct web locations with low latency.
+
+### Provision AWS Resources
+
+There are 03 ways to provision AWS resources:
+- **AWS Management Console**: A web-based interface that you can use to manage your AWS resources.
+- **AWS Command Line Interface (CLI)**: A command-line tool that allows you to interact with AWS services using commands in your command shell.
+- **AWS Software Development Kits (SDKs)**: SDKs are available in multiple programming languages. You can use the SDKs to interact with AWS services using your preferred programming language.
+
+#### AWS Elastic Beanstalk
+
+- With **AWS Elastic Beanstalk**, you provide code and configuration settings, and Elastic Beanstalk deploys the resources necessary to perform the following tasks:
+    - Adjust capacity according to incoming traffic.
+    - Load balance traffic.
+    - Auto-scaling.
+    - Monitoring application health.
+- Elastic Beanstalk is known as a `Platform as a Service (PaaS)`.
+
+#### AWS CloudFormation
+
+- With AWS CloudFormation, you can treat your infrastructure as code. This means that you can build an environment by writing lines of code instead of using the AWS Management Console to individually provision resources.

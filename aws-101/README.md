@@ -155,3 +155,66 @@ There are 03 ways to provision AWS resources:
 #### AWS CloudFormation
 
 - With AWS CloudFormation, you can treat your infrastructure as code. This means that you can build an environment by writing lines of code instead of using the AWS Management Console to individually provision resources.
+
+## Networking
+
+### Amazon Virtual Private Cloud (VPC)
+
+- A networking service that you can use to establish boundaries around your AWS resources is **Amazon Virtual Private Cloud (Amazon VPC)**
+- Amazon VPC enables you to provision an isolated section of the AWS Cloud.
+
+#### Internet Gateway
+
+- To allow public traffic from the internet to access your VPC, you need to attach an **Internet Gateway** to your VPC.
+
+![alt text](images/internet_gatewat.png)
+
+#### Virtual Private Gateway
+
+- A virtual private gateway enables you to establish a virtual private network (VPN) connection between your VPC and a private network, such as an on-premises data center or internal corporate network.
+
+![alt text](images/virtual_private_gw.png)
+
+#### AWS Direct Connect
+
+- **AWS Direct Connect** is a service that enables you to establish a dedicated network connection between your network and one of the AWS Direct Connect locations.
+- Suppose that there is an apartment building with a hallway directly linking the building to the coffee shop. Only the residents of the apartment building can travel through this hallway. 
+
+![alt text](images/aws_direct_connect.png)
+
+### Subnets and Network Access Control Lists (NACLs)
+
+#### Subnets
+
+- A subnet is a section of a VPC in which you can group resources based on securiy or operational needs. Subnets can be public or private.
+- **Public Subnet**: A subnet contains resources that can be accessed from the internet.
+- **Private Subnet**: A subnet contains resources that cannot be accessed from the internet. Such as databases.
+- Before *packet*  can enter into a subnet or exit from a subnet, it must pass through a `Network Access Control List (NACL)`.
+
+#### Network Access Control Lists (NACLs)
+
+- A NACL is a virtual firewall that controls inbound and outbound traffic at the subnet level.
+- By default, a NACL allows all inbound and outbound traffic. You can create custom NACLs to control traffic.
+- For custom NACLs, you can create rules that allow or deny traffic based on IP addresses, protocols, and ports. All inbound and outbound traffic is denied by default until you add rules.
+- **NACLs perform stateless filtering**. They remember nothing and check packets that cross the subnet boundary each way: in and out.
+- After a packet crosses the subnet boundary, it is checked by the `Security Group` associated with the resource.
+
+#### Security Groups
+
+- A security group acts as a virtual firewall for your instance to control inbound and outbound traffic.
+- You can add custom rules to configure which traffic should be allowed; any other traffic would then be denied.
+- **Security Groups are stateful**. They remember previous decisions made for incoming packets.
+
+![alt text](images/sg_vs_acls.png)
+
+### Global Networking
+
+#### DNS
+
+- Nothing to talk about DNS. Just the "phone book" of the internet.
+
+#### Amazon Route 53
+
+- **Amazon Route 53** is a DNS web service. It gives developers and businesses a reliable way to route end users to internet applications hosted in AWS.
+- Amazon Route 53 connects user requests to infrastructure running in AWS (such as Amazon EC2 instances and load balancers). It can route users to infrastructure outside of AWS.
+- Another feature of Amazon Route 53 is the ability to register domain names. You can also transfer DNS records for existing domain names to Amazon Route 53.

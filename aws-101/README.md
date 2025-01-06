@@ -17,6 +17,35 @@
     - [Amazon Elastic Container Service (ECS) & Amazon Elastic Kubernetes Service (EKS)](#amazon-elastic-container-service-ecs--amazon-elastic-kubernetes-service-eks)
     - [AWS Fargate](#aws-fargate)
     - [Sumary](#sumary)
+- [Global Infrastructure & Reliablity](#global-infrastructure--reliablity)
+    - [Regions](#regions)
+    - [Availability Zones](#availability-zones)
+    - [Edge Locations](#edge-locations)
+    - [Provision AWS Resources](#provision-aws-resources)
+        - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
+        - [AWS CloudFormation](#aws-cloudformation)
+- [Networking](#networking)
+    - [Amazon Virtual Private Cloud (VPC)](#amazon-virtual-private-cloud-vpc)
+        - [Internet Gateway](#internet-gateway)
+        - [Virtual Private Gateway](#virtual-private-gateway)
+        - [AWS Direct Connect](#aws-direct-connect)
+    - [Subnets and Network Access Control Lists (NACLs)](#subnets-and-network-access-control-lists-nacls)
+        - [Subnets](#subnets)
+        - [Network Access Control Lists (NACLs)](#network-access-control-lists-nacls)
+        - [Security Groups](#security-groups)
+    - [Global Networking](#global-networking)
+        - [DNS](#dns)
+        - [Amazon Route 53](#amazon-route-53)
+- [Storage and Database](#storage-and-database)
+    - [Instance Stores and Amazon Elastic Block Store (EBS)](#instance-stores-and-amazon-elastic-block-store-ebs)
+        - [Instance Stores](#instance-stores)
+        - [Amazon Elastic Block Store (EBS)](#amazon-elastic-block-store-ebs)
+    - [Amazon S3](#amazon-s3)
+        - [Object Storage](#object-storage)
+        - [Amazon S3 Storage Classes](#amazon-s3-storage-classes)
+    - [Amazon Elastic File System (EFS)](#amazon-elastic-file-system-efs)
+    - [Amazon RDS](#amazon-rds)
+    - [Other Storage services](#other-storage-services)
 
 ## "Compute in the Cloud"
 
@@ -218,3 +247,84 @@ There are 03 ways to provision AWS resources:
 - **Amazon Route 53** is a DNS web service. It gives developers and businesses a reliable way to route end users to internet applications hosted in AWS.
 - Amazon Route 53 connects user requests to infrastructure running in AWS (such as Amazon EC2 instances and load balancers). It can route users to infrastructure outside of AWS.
 - Another feature of Amazon Route 53 is the ability to register domain names. You can also transfer DNS records for existing domain names to Amazon Route 53.
+
+## Storage and Database
+
+### Instance Stores and Amazon Elastic Block Store (EBS)
+
+#### Instance Stores
+
+- **Instance Store** is a temporary block-level storage that is physically attached to the host computer for an EC2 instance. It behaves like a physical hard drive.
+- An instance store is disk storage that is physically attached to the host computer for an EC2 instance, and therefore has the same lifespan as the instance.
+
+#### Amazon Elastic Block Store (EBS)
+
+- **Amazon Elastic Block Store (Amazon EBS)** provides block-level storage volumes for use with Amazon EC2 instances.
+- Backup and restore: You can create snapshots of EBS.
+
+![alt text](images/ebs_snapshot.png)
+
+### Amazon S3
+
+#### Object Storage
+
+- In object storage, each object consists of data, metadata and key.
+- Data may be in any format, such as text, image, video, or audio.
+- **Amazon S3** is a service that provides object-level storage. Amazon S3 stores data as objects in buckets.
+- Maximum object size: 5TB.
+- In S3, you pay only for what you use.
+- Consider two factors:
+    - How often you plan to retrieve data.
+    - How available you need the data to be.
+
+#### Amazon S3 Storage Classes
+
+- **Amazon S3 Standard**: 
+    - For frequently accessed data.
+    - Stores data in a **minimum of three Availability Zones**.
+    - Amazon S3 Standard has a higher cost than other storage classes intended for infrequently accessed data and archival storage.
+- **Amazon S3 Standard-Infrequent Access (S3 Standard-IA)**:
+    - Ideal for infrequently accessed data.
+    - Similar to Amazon S3 Standard, but with lower storage costs and higher retrieval costs. 
+- **Amazon S3 One Zone-Infrequent Access (S3 One Zone-IA)**:
+    - Ideal for infrequently accessed data that does not require the same level of availability and durability as Amazon S3 Standard or S3 Standard-IA.
+    - Stores data in a single Availability Zone.
+    - Has a lower storage price than Amazon S3 Standard-IA.
+- **Amazon S3 Intelligent-Tiering**:
+    - Automatically moves objects between two access tiers based on changing access patterns.
+    - Designed for customers who want to optimize storage costs automatically when data access patterns change.
+    - Requires a small monthly monitoring and automation fee per object
+- **Amazon S3 Glacier Instant Retrieval**:
+    - Works well for archived data that requires immediate access, Can retrieve objects within a few milliseconds.
+    - Data is stored in a durable, secure, and low-cost storage class.
+- **Amazon S3 Glacier Flexible Retrieval**:
+    - Ideal for archived data that requires access within minutes to hours.
+    - Low-cost storage designed for data archiving
+- **Amazon S3 Glacier Deep Archive**:
+    - Lowest-cost object storage class ideal for archiving
+    - Able to retrieve objects within 12 hours
+- **Amazon S3 Outposts**:
+    - Ideal for workloads that require low-latency access to data on-premises.
+    - Provides object storage on premises.
+
+### Amazon Elastic File System (EFS)
+
+- Amazon EFS is a regional service. It stores data in and across multiple Availability Zones.
+- Compared to block storage and object storage, file storage is ideal for use cases in which a large number of services and resources need to access the same data at the same time.
+- The duplicate storage enables you to access data concurrently from all the Availability Zones in the Region where a file system is located.
+
+### Amazon RDS
+
+- **Amazon Relational Database Service (Amazon RDS)** is a managed service that makes it easy to set up, operate, and scale a relational database in the cloud.
+- Amazon RDS is a managed service that automates tasks such as hardware provisioning, database setup, patching, and backups.
+- Available engines: Amazon Aurora, PostgreSQL, MySQL, MariaDB, Oracle, and Microsoft SQL Server.
+- `Amazon Aurora(opens in a new tab)` is an enterprise-class relational database. It is compatible with MySQL and PostgreSQL relational databases.
+
+### Other Storage services
+
+- Amazon DynamoDB: A key-value database service.
+- Amazon Redshift: A data warehousing service.
+- Amazon Database Migration Service: A service that helps you migrate databases to AWS quickly and securely.
+- Amazon DocumentDB: A document database service that is compatible with MongoDB.
+- Amazon Neptune: A graph database service.
+- Amazon ElastiCache: A web service that makes it easy to deploy, operate, and scale an in-memory cache in the cloud.

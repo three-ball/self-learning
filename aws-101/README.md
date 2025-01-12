@@ -318,7 +318,7 @@ There are 03 ways to provision AWS resources:
 - **Amazon Relational Database Service (Amazon RDS)** is a managed service that makes it easy to set up, operate, and scale a relational database in the cloud.
 - Amazon RDS is a managed service that automates tasks such as hardware provisioning, database setup, patching, and backups.
 - Available engines: Amazon Aurora, PostgreSQL, MySQL, MariaDB, Oracle, and Microsoft SQL Server.
-- `Amazon Aurora(opens in a new tab)` is an enterprise-class relational database. It is compatible with MySQL and PostgreSQL relational databases.
+- `Amazon Aurora` is an enterprise-class relational database. It is compatible with MySQL and PostgreSQL relational databases.
 
 ### Other Storage services
 
@@ -328,3 +328,118 @@ There are 03 ways to provision AWS resources:
 - Amazon DocumentDB: A document database service that is compatible with MongoDB.
 - Amazon Neptune: A graph database service.
 - Amazon ElastiCache: A web service that makes it easy to deploy, operate, and scale an in-memory cache in the cloud.
+
+## Security
+
+### AWS Shared Responsibility Model
+
+- The shared responsibility model divides into customer responsibilities (commonly referred to as **"security in the cloud"**) and AWS responsibilities (commonly referred to as **"security of the cloud"**).
+
+![alt text](images/shared_responsibility_model.png)
+
+### AWS Identity and Access Management (IAM)
+
+- **AWS Identity and Access Management (IAM)** enables you to manage access to AWS services and resources securely.
+- When you first create an AWS account, you begin with an identity known as the **root user**. Root user has complete access to all AWS services and resources in the account.
+
+![alt text](images/root_user_iam.png)
+
+> Best practice: Do not use the root user for everyday tasks. Instead, use the root user to create your first IAM user and assign it permission to create other users. Then, countinue to create other IAM users.
+
+#### IAM Users
+
+- An IAM User is an identity that you create ion AWS. It **represents a person or service** that interacts with AWS services and resources.
+- By default, when you create a new IAM user in AWS, it has no permissions associated with it. To allow the IAM user to perform specific actions in AWS, you mus grant the IAM user the necessary permissions.
+
+> Best practice: AWS recommend that you create individual IAM users for each person who needs to access AWS.  
+
+#### IAM Policies
+
+- An IAM policy is a document that allows or denies permissions to AWS services and resources.
+- IAM policies enable you to customize users levels of access to resources. For example, you can allow users to access all of the Amazon S3 buckets within your AWS account, or only a specific bucket.
+- Example IAM policy:
+
+```json
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Action": "s3:ListObject",
+            "Resource": "arn:aws:s3:::my_bucket/*"
+        }
+    ]
+}
+```
+
+> Best practice: Follow the security principle of least privilege. This means that you should grant only the permissions that are required to perform a task.
+
+#### IAM groups
+
+- An IAM group is a collection of IAM users. You can use groups to specify permissions for multiple users, which can make it easier to manage permissions for those users.
+
+![alt text](images/iam_group.png)
+
+#### IAM Roles
+
+- **An IAM role** is an identity that you can assume to gain temporary access to permissions.
+-  When someone assumes an IAM role, they abandon all previous permissions that they had under a previous role and assume the permissions of the new role. 
+
+> Best practice: IAM roles are ideal for situations in which access to services or resources needs to be granted temporarily, instead of long-term.
+
+### Denial of Service (DoS) and Distributed Denial of Service (DDoS) Attacks
+
+- A denial-of-service (DoS) attack is a deliberate attempt to make a website or application unavailable to users.
+- For example, an attacker might flood a website or application with excessive network traffic until the targeted website or application becomes overloaded and is no longer able to respond.
+
+![alt text](images/dos.png)
+
+- A distributed denial-of-service (DDoS) attack is a type of DoS attack in which multiple compromised systems are used to target a single system.
+
+![alt text](images/ddos.png)
+
+#### AWS Shield
+
+- **AWS Shield** is a service that protects applications against DDoS attacks. AWS Shield provides two levels of protection: `Standard` and `Advanced`.
+    - **AWS Shield Standard** is automatically included at no extra cost with AWS services.
+    - **AWS Shield Advanced** provides additional protection against more sophisticated DDoS attacks, it is a paid service.
+
+### Additinal Security Services
+
+- **AWS Key Management Service (KMS)**: A managed service that makes it easy for you to create and control the encryption keys used to encrypt your data.
+- **AWS WAF**: A web application firewall that helps protect your web applications from common web exploits.
+- **Amazon Inspector**: An automated security assessment service that helps improve the security and compliance of applications deployed on AWS.
+- **Amazon GuardDuty**: A threat detection service that continuously monitors for malicious activity and unauthorized behavior to protect your AWS accounts and workloads.
+
+## Monitoring and Analytics
+
+### Amazon CloudWatch
+
+- **Amazon CloudWatch** is a web service that enables you to monitor and mange various metrics, as well as configure alarm actions based on data from those metrics.
+- CloudWatch uses metrics to represent the data points for your resources. AWS services send metrics to CloudWatch.
+
+![alt text](images/cloud_watch_dashboard.png)
+
+### Amazon CloudTrail
+
+- **AWS CloudTrail** records API calls for your account. The recorded information includes the identity of the API caller, the time of the API call, the source IP address of the API caller, and more.
+- Within CloudTrail, you can also enable `CloudTrail Insights`. This optional feature allows CloudTrail to automatically detect unusual API activities in your AWS account. 
+
+![alt text](images/cloudtrail.png)
+
+### AWS Trusted Advisor
+
+- **AWS Trusted Advisor** is a web service that inspects your AWS environment and provides real-time recommendations in accordance with AWS best practices.
+- Trusted Advisor compares its findings to AWS best practices in five categories:
+    - Cost Optimization
+    - Performance
+    - Security
+    - Fault Tolerance
+    - Service Limits
+
+![alt text](images/trusted_advisor.png)
+
+- In Trusted Advisor console: 
+    - **The green check** indicates the number of items for which it detected no problems.
+    - **The orange triangle** represents the number of recommended investigations.
+    - **The red flag** represents the number of recommended actions.

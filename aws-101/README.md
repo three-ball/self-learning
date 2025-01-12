@@ -192,6 +192,8 @@ There are 03 ways to provision AWS resources:
 - A networking service that you can use to establish boundaries around your AWS resources is **Amazon Virtual Private Cloud (Amazon VPC)**
 - Amazon VPC enables you to provision an isolated section of the AWS Cloud.
 
+![alt text](images/vpc_arch.png)
+
 #### Internet Gateway
 
 - To allow public traffic from the internet to access your VPC, you need to attach an **Internet Gateway** to your VPC.

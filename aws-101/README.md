@@ -191,6 +191,11 @@ There are 03 ways to provision AWS resources:
 
 - A networking service that you can use to establish boundaries around your AWS resources is **Amazon Virtual Private Cloud (Amazon VPC)**
 - Amazon VPC enables you to provision an isolated section of the AWS Cloud.
+- In this isolated section, you can launch resources in Virtual Networks that you define. Your VPC is completely contained in a single Region and span multiple Availability Zones.
+
+> What the heck is Zonal Service?
+> The term Zonal service refers to AWS services with resources that are assigned on an AZ level.
+> Using resources in multiple AZs increases the relability, performance, and fault tolerance of your applications.
 
 ![alt text](images/vpc_arch.png)
 
@@ -221,6 +226,8 @@ There are 03 ways to provision AWS resources:
 - **Public Subnet**: A subnet contains resources that can be accessed from the internet.
 - **Private Subnet**: A subnet contains resources that cannot be accessed from the internet. Such as databases.
 - Before *packet*  can enter into a subnet or exit from a subnet, it must pass through a `Network Access Control List (NACL)`.
+
+![alt text](images/subnets.png)
 
 #### Network Access Control Lists (NACLs)
 
@@ -304,7 +311,7 @@ There are 03 ways to provision AWS resources:
     - Low-cost storage designed for data archiving
 - **Amazon S3 Glacier Deep Archive**:
     - Lowest-cost object storage class ideal for archiving
-    - Able to retrieve objects within 12 hours
+    - Able to retrieve objects within `12 hours`
 - **Amazon S3 Outposts**:
     - Ideal for workloads that require low-latency access to data on-premises.
     - Provides object storage on premises.
@@ -445,3 +452,80 @@ There are 03 ways to provision AWS resources:
     - **The green check** indicates the number of items for which it detected no problems.
     - **The orange triangle** represents the number of recommended investigations.
     - **The red flag** represents the number of recommended actions.
+
+## Pricing and Support
+
+### AWS Free Tier
+
+- [The AWS Free Tier](https://aws.amazon.com/free/) enables you to begin using certain services without having to worry about incurring costs for the specified period.
+    - Always free: These offers do not expire and are available to all AWS customers. Example:
+        - 25GB of Amazon DynamoDB storage.
+        - AWS Lambda allows 1 million free requests and up to 3.2 million seconds of compute time per month.
+    - 12 months free: These offers are available to new AWS customers and are available for 12 months following your AWS sign-up date. Example:
+        - 750 hours of Amazon EC2 Linux t2.micro instance usage.
+        - 5GB of Amazon S3 storage.
+    - Trials: Shor-term free trials that start from the date you activate a service.
+
+### Pricing Concepts
+
+- **Pay for what you use**: You pay only for the services you use, pay for the resources you consume without any upfront or long-term commitments.
+- **Pay less when you reserve**: Some services offer reservation options that provide a significant discount compared to On-Demand Instance pricing.
+- **Pay less with volume**: The more you use, the less you pay per unit. Some services offer tiered pricing, so the per-unit cost is incrementally lower with increased usage.
+
+#### Pricing Examples
+
+- **AWS Lambda**: For AWS Lambda, you are charged based on the **number of requests for your functions** and **the time that it takes for them to run**. You can save on AWS Lambda costs by signing up for a Compute Savings Plan (offers lower compute costs in exchange for committing to a consistent amount of usage over a 1-year or 3-year term)
+
+![alt text](images/lambda_pricing_example.png)
+
+- **Amazon EC2**: For Amazon EC2, you pay for only the **compute time that you use** while your instances are running.
+
+![alt text](images/ec2_pricing_example.png)
+
+- **Amazon S3**: For Amazon S3, you pay for the **storage** that you use, the **number of requests made to your data**, the amount of **data transferred** out of Amazon S3 and **management, replication**.
+
+![alt text](images/s3_pricing_example.png)
+
+### Billing Dashboard
+
+- Use the **AWS Billing & Cost Management dashboard** to pay your AWS bill, monitor your usage, and analyze and control your costs.
+
+#### Consolidated Billing
+
+- **The consolidated billing** feature of AWS Organizations enables you to receive a single bill for all AWS accounts in your organization.
+
+![alt text](images/consolidated_billing.png)
+
+### AWS Budgets
+
+- In **AWS Budgets**, you can create budgets to plan your service usage, service costs, and instance reservations. 
+- The information in AWS Budgets updates three times a day. This helps you to accurately determine how close your usage is to your budgeted amounts or to the AWS Free Tier limits.
+
+![alt text](images/aws_budget.png)
+
+### AWS Cost Explorer
+
+- **AWS Cost Explorer** is a tool that enables you to visualize, understand, and manage your AWS costs and usage over time.
+- Include a default report of the costs and usage for your top five cost-accruing services.
+
+![alt text](images/cost_explorer.png)
+
+### AWS Support Plans
+
+#### Basic Support
+
+- **Basic Support** is free for all AWS customers. It includes access to whitepapers, documentation, and support communities.
+- With Basic Support, you have access to a limited selection of **AWS Trusted Advisor** checks. Additionally, you can use the **AWS Personal Health Dashboard**, a tool that provides alerts and remediation guidance when AWS is experiencing events that may affect you.
+
+#### TAM (Technical Account Manager)
+
+- **The Enterprise On-Ramp** and **Enterprise Support** plans include access to a Technical Account Manager (TAM).
+- **TAMs provide expert engineering guidance**, help you design solutions that efficiently integrate AWS services, assist with cost-effective and resilient architectures, and provide direct access to AWS programs and a broad community of experts.
+
+| `Feature`                        | `Developer`                          | `Business`                                 | `Enterprise On-Ramp`                          | `Enterprise`                                                   |
+|--------------------------------|------------------------------------|------------------------------------------|---------------------------------------------|-------------------------------------------------------------|
+| **Case Severity/ Response Times** | General guidance: < `24 hours`<br>System impaired: < `12 hours` | General guidance: < `24 hours`<br>System impaired: < `12 hours`<br>Production system impaired: < `4 hours`<br>Production system down: < `1 hour` | General guidance: < `24 hours`<br>System impaired: < `12 hours`<br>Production system impaired: < `4 hours`<br>Production system down: < `1 hour`<br>Business-critical system down: < `30 minutes` | General guidance: < `24 hours`<br>System impaired: < `12 hours`<br>Production system impaired: < `4 hours`<br>Production system down: < `1 hour`<br>Business/Mission-critical system down: < `15 minutes` |
+| **Architectural Guidance**      | General                           | Contextual to your use-cases             | Annual consultative review and guidance based on your applications | Consultative reviews and guidance based on your applications |
+| **Technical Account Management** | `N/A`                              | `N/A`                                      | A pool of Technical Account Managers to provide proactive guidance | Designated Technical Account Manager (TAM) to provide consultative architectural and operational guidance delivered in the context of your applications and use-cases |
+| **AWS Trusted Advisor**         | Service Quota and basic Security checks | Full set of checks                       | Full set of checks                            | Full set of checks and prioritized recommendations curated by AWS account team with AWS Trusted Advisor |
+

@@ -529,3 +529,62 @@ There are 03 ways to provision AWS resources:
 | **Technical Account Management** | `N/A`                              | `N/A`                                      | A pool of Technical Account Managers to provide proactive guidance | Designated Technical Account Manager (TAM) to provide consultative architectural and operational guidance delivered in the context of your applications and use-cases |
 | **AWS Trusted Advisor**         | Service Quota and basic Security checks | Full set of checks                       | Full set of checks                            | Full set of checks and prioritized recommendations curated by AWS account team with AWS Trusted Advisor |
 
+
+## Migration & Innovation
+
+### AWS Cloud Adoption Framework (AWS CAF)
+
+- At the highest level, thje AWS Cloud Adoption Framework organizes guidance into six areas of focus, called **perspectives**.
+    - **Business Capabiblities**:
+        - Business Perspective: Ensures that IT aligns with business needs and that IT investments link to key business results.
+        - People Perspective: Supports development of an organization-wide change management strategy for cloud adoption.
+        - Governance Perspective: focuses on the skills and processes to align IT strategy with business strategy. This ensures that you maximize the business value and minimize risks.
+    - **Technology Capabilities**:
+        - Platform Perspective: includes principles and patterns for implementing new solutions on the cloud, and migrating on-premises workloads to the cloud.
+        - Security Perspective: ensures that the organization meets security objectives for visibility, auditability, control, and agility. 
+        - Operations Perspective: helps you to enable, run, use, operate, and recover IT workloads to the level agreed upon with your business stakeholders.\
+
+### Migration Strategies
+
+- **Rehosting**: Also known as "lift and shift". This strategy involves moving your existing applications to the cloud with minimal changes.
+- **Replatforming**: also known as "lift, tinker, and shift",Involves making a few cloud optimizations to your applications to take advantage of some cloud capabilities.
+- **Refactoring**: Also known as "re-architecting". This strategy involves making significant changes to your applications to take full advantage of cloud-native features.
+- **Repurchasing**: involves moving from a traditional license to a software-as-a-service model. 
+- **Retiring**: Involves decommissioning an application or service that is no longer needed.
+- **Retaining**: Involves keeping an application on-premises or in its current state.
+
+### AWS Snow Family
+
+- **AWS Snow Family** is a collection of physical devices that help you transfer large amounts of data into and out of AWS.
+- **AWS Snowcone**: A small, rugged, and secure edge computing and data transfer device.
+- **AWS Snowball**: A petabyte-scale data transport solution that uses secure appliances to transfer large amounts of data into and out of AWS.
+    - **Snowball Edge Storage Optimized**: 
+        - Storage: 80 TB of hard disk drive (HDD) capacity for block volumes and Amazon S3 compatible object storage, and 1 TB of SATA solid state drive (SSD) for block volumes. 
+        - Compute: 40 vCPUs, and 80 GiB of memory to support Amazon EC2 sbe1 instances (equivalent to C5).
+    - **Snowball Edge Compute Optimized**:
+        - Storage: 80-TB usable HDD capacity for Amazon S3 compatible object storage or Amazon EBS compatible block volumes and 28 TB of usable NVMe SSD capacity for Amazon EBS compatible block volumes. 
+        - Compute: 104 vCPUs, 416 GiB of memory, and an optional NVIDIA Tesla V100 GPU. Devices run Amazon EC2 sbe-c and sbe-g instances, which are equivalent to C5, M5a, G3, and P3 instances.
+- **AWS Snowmobile**: AWS Snowmobile is a service that is used for transferring up to 100 PB of data to AWS.
+
+## AWS Well-Architected Framework
+
+- The **AWS Well-Architected Framework**  helps you understand how to design and operate `reliable`, `secure`, `efficient`, and `cost-effective` systems in the AWS Cloud.
+- There are six pillars:
+    - **Operational Excellence**: is the ability to run and monitor systems to deliver business value and to continually improve supporting processes and procedures.  
+    - **Security**: is the ability to protect information, systems, and assets while delivering business value through risk assessments and mitigation strategies. 
+    - **Reliability**: is the ability of a system to do the following:
+        - Recover from failures and continue to function.
+        - Dynamically acquire computing resources to meet demand.
+        - Mitigate disruptions such as misconfigurations or transient network issues.
+    - **Performance Efficiency**: is the ability to use computing resources efficiently to meet system requirements and to maintain that efficiency as demand changes and technologies evolve. 
+    - **Cost Optimization**: is the ability to run systems to deliver business value at the lowest price point. 
+    - **Sustainability**: is the ability to continually improve sustainability impacts by reducing energy consumption and increasing efficiency across all components of a workload by maximizing the benefits from the provisioned resources and minimizing the total resources required.
+
+### Benefits of the AWS Well-Architected Framework
+
+- Trade upfront expense for variable expense.
+- Benefit from massive economies of scale.
+- Stop guessing capacity.
+- Increase speed and agility.
+- Stop spending money running and maintaining data centers.
+- Go global in minutes.

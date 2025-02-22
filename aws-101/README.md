@@ -5,6 +5,7 @@
 ## Resources
 
 - [AWS Skill Builder](https://explore.skillbuilder.aws/)
+- [Ultimate AWS Certified Cloud Practitioner CLF-C02 2025](https://www.udemy.com/course/aws-certified-cloud-practitioner-new/)
 
 ## Table of Contents
 
@@ -76,9 +77,16 @@
     - [Migration Strategies](#migration-strategies)
     - [AWS Snow Family](#aws-snow-family)
 - [AWS Well-Architected Framework](#aws-well-architected-framework)
+    
 
 
 ## "Compute in the Cloud"
+
+### On-Premises vs. IaaS vs. PaaS vs. SaaS
+
+![alt text](images/iaaspaassaas.png)
+
+![alt text](images/iaas_example.png)
 
 ### EC2 - Elastic Compute Cloud
 
@@ -199,9 +207,9 @@
 ### Provision AWS Resources
 
 There are 03 ways to provision AWS resources:
-- **AWS Management Console**: A web-based interface that you can use to manage your AWS resources.
-- **AWS Command Line Interface (CLI)**: A command-line tool that allows you to interact with AWS services using commands in your command shell.
-- **AWS Software Development Kits (SDKs)**: SDKs are available in multiple programming languages. You can use the SDKs to interact with AWS services using your preferred programming language.
+- **AWS Management Console** - Using password and MFA: A web-based interface that you can use to manage your AWS resources.
+- **AWS Command Line Interface (CLI)** - Using Access Key: A command-line tool that allows you to interact with AWS services using commands in your command shell.
+- **AWS Software Development Kits (SDKs)** - Using Access Key: SDKs are available in multiple programming languages. You can use the SDKs to interact with AWS services using your preferred programming language.
 
 #### AWS Elastic Beanstalk
 
@@ -381,6 +389,10 @@ There are 03 ways to provision AWS resources:
 
 - **AWS Identity and Access Management (IAM)** enables you to manage access to AWS services and resources securely.
 - When you first create an AWS account, you begin with an identity known as the **root user**. Root user has complete access to all AWS services and resources in the account.
+- Root account created by default, shouldn't bbe used or shared.
+- Users are people within your organization and they can be grouped into IAM groups.
+- Group only contains users, not other groups.
+- Users don't have to belong to any group, and user can belong to multiple groups.
 
 ![alt text](images/root_user_iam.png)
 
@@ -424,8 +436,16 @@ There are 03 ways to provision AWS resources:
 
 - **An IAM role** is an identity that you can assume to gain temporary access to permissions.
 -  When someone assumes an IAM role, they abandon all previous permissions that they had under a previous role and assume the permissions of the new role. 
+- IAM roles just like IAM users, buit they are intended to be used not by physical people, they are used by services.
 
 > Best practice: IAM roles are ideal for situations in which access to services or resources needs to be granted temporarily, instead of long-term.
+
+#### IAM Security Tools
+
+- **IAM Credentials Report (Account Level)**: A report that lists all of the IAM users in your account and the status of their various credentials.
+- **IAM Access Advisor (User Level)**: A tool that shows the service permissions granted to a user and when those services were last accessed.
+
+> Best practice: Use Access Keys for programmatic access (CLI/SDK) and use IAM roles for applications.
 
 ### Denial of Service (DoS) and Distributed Denial of Service (DDoS) Attacks
 

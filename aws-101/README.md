@@ -9,74 +9,80 @@
 
 ## Table of Contents
 
-- [Compute in the Cloud](#compute-in-the-cloud)
+- [AWS 101](#aws-101)
+  - [Resources](#resources)
+  - [Table of Contents](#table-of-contents)
+  - ["Compute in the Cloud"](#compute-in-the-cloud)
+    - [On-Premises vs. IaaS vs. PaaS vs. SaaS](#on-premises-vs-iaas-vs-paas-vs-saas)
     - [EC2 - Elastic Compute Cloud](#ec2---elastic-compute-cloud)
     - [EC2 Auto Scaling](#ec2-auto-scaling)
     - [Elastic Load Balancing (ELB)](#elastic-load-balancing-elb)
-    - [Amazon Simple Notification Service (SNS) & Amazon Simple Queue Service (SQS)](#amazon-simple-notification-service-sns--amazon-simple-queue-service-sqs)
+    - [Amazon Simple Notification Service (SNS) \& Amazon Simple Queue Service (SQS)](#amazon-simple-notification-service-sns--amazon-simple-queue-service-sqs)
     - [AWS Lambda](#aws-lambda)
-    - [Amazon Elastic Container Service (ECS) & Amazon Elastic Kubernetes Service (EKS)](#amazon-elastic-container-service-ecs--amazon-elastic-kubernetes-service-eks)
+    - [Amazon Elastic Container Service (ECS) \& Amazon Elastic Kubernetes Service (EKS)](#amazon-elastic-container-service-ecs--amazon-elastic-kubernetes-service-eks)
     - [AWS Fargate](#aws-fargate)
     - [Sumary](#sumary)
-- [Global Infrastructure & Reliablity](#global-infrastructure--reliablity)
+  - [Global Infrastructure \& Reliablity](#global-infrastructure--reliablity)
     - [Regions](#regions)
     - [Availability Zones](#availability-zones)
     - [Edge Locations](#edge-locations)
     - [Provision AWS Resources](#provision-aws-resources)
-        - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
-        - [AWS CloudFormation](#aws-cloudformation)
-- [Networking](#networking)
+      - [AWS Elastic Beanstalk](#aws-elastic-beanstalk)
+      - [AWS CloudFormation](#aws-cloudformation)
+  - [Networking](#networking)
     - [Amazon Virtual Private Cloud (VPC)](#amazon-virtual-private-cloud-vpc)
-        - [Internet Gateway](#internet-gateway)
-        - [Virtual Private Gateway](#virtual-private-gateway)
-        - [AWS Direct Connect](#aws-direct-connect)
+      - [Internet Gateway](#internet-gateway)
+      - [Virtual Private Gateway](#virtual-private-gateway)
+      - [AWS Direct Connect](#aws-direct-connect)
     - [Subnets and Network Access Control Lists (NACLs)](#subnets-and-network-access-control-lists-nacls)
-        - [Subnets](#subnets)
-        - [Network Access Control Lists (NACLs)](#network-access-control-lists-nacls)
-        - [Security Groups](#security-groups)
+      - [Subnets](#subnets)
+      - [Network Access Control Lists (NACLs)](#network-access-control-lists-nacls)
+      - [Security Groups](#security-groups)
     - [Global Networking](#global-networking)
-        - [DNS](#dns)
-        - [Amazon Route 53](#amazon-route-53)
-- [Storage and Database](#storage-and-database)
+      - [DNS](#dns)
+      - [Amazon Route 53](#amazon-route-53)
+  - [Storage and Database](#storage-and-database)
     - [Instance Stores and Amazon Elastic Block Store (EBS)](#instance-stores-and-amazon-elastic-block-store-ebs)
-        - [Instance Stores](#instance-stores)
-        - [Amazon Elastic Block Store (EBS)](#amazon-elastic-block-store-ebs)
+      - [Instance Stores](#instance-stores)
+      - [Amazon Elastic Block Store (EBS)](#amazon-elastic-block-store-ebs)
     - [Amazon S3](#amazon-s3)
-        - [Object Storage](#object-storage)
-        - [Amazon S3 Storage Classes](#amazon-s3-storage-classes)
+      - [Object Storage](#object-storage)
+      - [Amazon S3 Storage Classes](#amazon-s3-storage-classes)
     - [Amazon Elastic File System (EFS)](#amazon-elastic-file-system-efs)
     - [Amazon RDS](#amazon-rds)
     - [Other Storage services](#other-storage-services)
-- [Security](#security)
+  - [Security](#security)
     - [AWS Shared Responsibility Model](#aws-shared-responsibility-model)
     - [AWS Identity and Access Management (IAM)](#aws-identity-and-access-management-iam)
-        - [IAM Users](#iam-users)
-        - [IAM Policies](#iam-policies)
-        - [IAM groups](#iam-groups)
-        - [IAM Roles](#iam-roles)
+      - [IAM Users](#iam-users)
+      - [IAM Policies](#iam-policies)
+      - [IAM groups](#iam-groups)
+      - [IAM Roles](#iam-roles)
+      - [IAM Security Tools](#iam-security-tools)
     - [Denial of Service (DoS) and Distributed Denial of Service (DDoS) Attacks](#denial-of-service-dos-and-distributed-denial-of-service-ddos-attacks)
-        - [AWS Shield](#aws-shield)
+      - [AWS Shield](#aws-shield)
     - [Additinal Security Services](#additinal-security-services)
-- [Monitoring and Analytics](#monitoring-and-analytics)
+  - [Monitoring and Analytics](#monitoring-and-analytics)
     - [Amazon CloudWatch](#amazon-cloudwatch)
     - [Amazon CloudTrail](#amazon-cloudtrail)
     - [AWS Trusted Advisor](#aws-trusted-advisor)
-- [Pricing and Support](#pricing-and-support)
+  - [Pricing and Support](#pricing-and-support)
     - [AWS Free Tier](#aws-free-tier)
     - [Pricing Concepts](#pricing-concepts)
-        - [Pricing Examples](#pricing-examples)
+      - [Pricing Examples](#pricing-examples)
     - [Billing Dashboard](#billing-dashboard)
-        - [Consolidated Billing](#consolidated-billing)
+      - [Consolidated Billing](#consolidated-billing)
     - [AWS Budgets](#aws-budgets)
     - [AWS Cost Explorer](#aws-cost-explorer)
     - [AWS Support Plans](#aws-support-plans)
-        - [Basic Support](#basic-support)
-        - [TAM (Technical Account Manager)](#tam-technical-account-manager)
-- [Migration & Innovation](#migration-innovation)
+      - [Basic Support](#basic-support)
+      - [TAM (Technical Account Manager)](#tam-technical-account-manager)
+  - [Migration \& Innovation](#migration--innovation)
     - [AWS Cloud Adoption Framework (AWS CAF)](#aws-cloud-adoption-framework-aws-caf)
     - [Migration Strategies](#migration-strategies)
     - [AWS Snow Family](#aws-snow-family)
-- [AWS Well-Architected Framework](#aws-well-architected-framework)
+  - [AWS Well-Architected Framework](#aws-well-architected-framework)
+    - [Benefits of the AWS Well-Architected Framework](#benefits-of-the-aws-well-architected-framework)
     
 
 
@@ -270,7 +276,7 @@ There are 03 ways to provision AWS resources:
 
 #### Network Access Control Lists (NACLs)
 
-- A NACL is a virtual firewall that controls inbound and outbound traffic at the subnet level.
+- A NACL is a virtual firewall that controls **inbound and outbound traffic at the subnet level**.
 - By default, a NACL allows all inbound and outbound traffic. You can create custom NACLs to control traffic.
 - For custom NACLs, you can create rules that allow or deny traffic based on IP addresses, protocols, and ports. All inbound and outbound traffic is denied by default until you add rules.
 - **NACLs perform stateless filtering**. They remember nothing and check packets that cross the subnet boundary each way: in and out.
@@ -278,9 +284,18 @@ There are 03 ways to provision AWS resources:
 
 #### Security Groups
 
-- A security group acts as a virtual firewall for your instance to control inbound and outbound traffic.
+- A security group acts as a **virtual firewall for your instance** to control inbound and outbound traffic.
 - You can add custom rules to configure which traffic should be allowed; any other traffic would then be denied.
+- Security Group only contain **allow** rules.
 - **Security Groups are stateful**. They remember previous decisions made for incoming packets.
+- Can be attached to multiple instances.
+- Security group is locked down to a region/VPC combinations.
+- If application is not accessible, check the security group first.
+- If application gives a connection refused, then it's an application error or it's not launched.
+- All **inbound traffic is blocked by default**.
+- All **outbound traffic is authorized by default**.
+
+> It's good to maintain one seperate security group for SSH Access.
 
 ![alt text](images/sg_vs_acls.png)
 
@@ -621,7 +636,13 @@ There are 03 ways to provision AWS resources:
 
 - The **AWS Well-Architected Framework**  helps you understand how to design and operate `reliable`, `secure`, `efficient`, and `cost-effective` systems in the AWS Cloud.
 - There are six pillars:
-    - **Operational Excellence**: is the ability to run and monitor systems to deliver business value and to continually improve supporting processes and procedures.  
+    - **Operational Excellence**: is the ability to run and monitor systems to deliver business value and to continually improve supporting processes and procedures.
+      - AWS CloudFormation.
+      - AWS Config.
+      - AWS CloudTrail.
+      - AWS CloudWatch.
+      - AWS X-Ray.
+      - AWS CodeBuild, AWS CodeDeploy, AWS CodePipeline, AWS CodeCommit.
     - **Security**: is the ability to protect information, systems, and assets while delivering business value through risk assessments and mitigation strategies. 
     - **Reliability**: is the ability of a system to do the following:
         - Recover from failures and continue to function.

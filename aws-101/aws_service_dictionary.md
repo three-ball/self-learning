@@ -130,3 +130,20 @@
 ### 25. AWS Edge Locations
 - **Keyword**: `Content Delivery`, `Low Latency`.
 - **Description**: An AWS Edge location is a site that CloudFront uses to cache copies of the content for faster delivery to users at any location.
+
+### 26. Amazon Macie
+- **Keyword**: `Security`, `Data Protection`, `Data Privacy`, `Sensitive data`.
+- **Description**: Amazon Macie is a fully managed data security and data privacy service that uses machine learning and pattern matching to discover and protect your sensitive data in AWS.
+
+### 27. AWS Glue
+- **Keyword**: `Data Integration`, `ETL`.
+- **Description**: AWS Glue is a fully managed extract, transform, and load (ETL) service that makes it easy for customers to prepare and load their data for analytics.
+
+### 28. AWS CloudTrail
+- **Keyword**: `Security`, `Audit`, `Compliance`.
+- **Description**: AWS CloudTrail is a service that enables governance, compliance, operational auditing, and risk auditing of your AWS account. The log files delivered by CloudTrail to your S3 bucket are encrypted using server-side encryption with Amazon S3 managed keys (SSE-S3).\
+
+### 29. AWS Shield Advanced
+- **Keyword**: `Security`, `DDoS Protection`.
+- **Description**: AWS Shield Advanced is a managed Distributed Denial of Service (DDoS) protection service that safeguards applications running on AWS. L3,L4,L7 DDoS protection.
+  - **Applied to**: EC2, Elastic Load Balancing, Amazon CloudFront, AWS Global Accelerator, and Route 53.

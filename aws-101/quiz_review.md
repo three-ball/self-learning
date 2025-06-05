@@ -193,3 +193,52 @@ AWS Organizations allows you to aggregate volume discounts for Amazon EC2 and Am
 All Amazon S3 buckets have encryption configured by default, and objects are automatically encrypted by using server-side encryption with Amazon S3 managed keys (SSE-S3).
 **AWS Storage Gateway**
 AWS Storage Gateway is a hybrid cloud storage service that gives you on-premises access to virtually unlimited cloud storage. All data transferred between the gateway and AWS storage is encrypted using SSL.
+
+18. According to the AWS Cloud Adoption Framework (AWS CAF), what are two tasks that a company should perform when planning to migrate to the AWS Cloud and aiming to become more responsive to customer inquiries and feedback as part of their organizational transformation?
+
+    - [x] Organize your teams around products and value streams
+    - [x] Leverage agile methods to rapidly iterate and evolve
+
+19. Which of the following AWS services can be used to connect a company's on-premises environment to a VPC without using the public internet?
+
+    - [x] AWS Direct Connect
+    - [ ] Amazon VPC
+    - [ ] Amazon Route 53
+    - [ ] AWS Site-to-Site VPN
+
+**AWS Direct Connect**
+You can use AWS Direct Connect to establish a private virtual interface from your on-premise network directly to your Amazon VPC, providing you with a private, high bandwidth network connection between your network and your VPC. **This connection is private and does not go over the public internet**. It takes at least a month to establish this physical connection.
+
+**AWS Site-to-Site VPN** - AWS Site-to-Site VPN creates a secure connection between your data center or branch office and your AWS cloud resources. This connection goes over the public internet.
+
+20. Which of the following are correct statements regarding the AWS Global Infrastructure? (Select two)
+
+    - [ ] Each Availability Zone (AZ) consists of two or more discrete data centers
+    - [ ] Each AWS Region consists of a minimum of two Availability Zones (AZ)
+    - [x] Each Availability Zone (AZ) consists of one or more discrete data centers
+    - [x] Each AWS Region consists of a minimum of three Availability Zones (AZ)
+    - [ ] Each AWS Region consists of two or more Edge Locations
+
+**Each Availability Zone (AZ) consists of one or more discrete data centers**
+Each Availability Zone (AZ) consists of one or more discrete data centers, each with redundant power, networking, and connectivity, housed in separate facilities.
+**Each AWS Region consists of a minimum of three Availability Zones (AZ)**
+Each AWS Region consists of a minimum of three Availability Zones (AZ) that are geographically separated from each other within the same geographic region.
+
+21. Which of the following AWS services support reservations to optimize costs? (Select three)
+
+    - [x] Amazon EC2
+    - [x] Amazon RDS
+    - [x] Amazon Redshift
+    - [ ] Amazon S3
+    - [ ] Amazon Route 53
+
+**AWS services support reservations**:
+- Amazon EC2 Reserved Instances (RI)
+- Amazon RDS RIs
+- Amazon DynamoDB Reserved Capacity
+- Amazon ElastiCache Reserved Nodes
+- Amazon Redshift Reserved Nodes
+
+
+
+

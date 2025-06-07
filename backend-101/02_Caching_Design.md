@@ -237,9 +237,98 @@ Data is written to cache immediately and asynchronously written to database late
     - **Data Relationships**: Complex relationships can lead to cascading invalidations.
     - **Unlike Database, Cache can be everywhere and anywhere**: Hard to finding root causes.
 
-- Consider Solution: `Read-Aside` + `Write-Around` with invalidation: `DELETE cache`. (`RA-DWA`). It may remain data inconsistency for a short time, but it is acceptable in most cases.
-
+- Consider Solution: 
+  - `Read-Aside` + `Write-Around` with invalidation: `DELETE cache`. (`RA-DWA`).
+  - It may remain data inconsistency for a short time, but it is acceptable in most cases. We can use `TTL` to reduce the inconsistency time.
+  - Update DB first, delete cache later.
 
 ## 3. Challenges
+
+### 3.1. Reliability Challenges
+
+#### 3.1.1. Problem 01: No Atomicity
+
+- **Context**:
+  - Customer updates their profile: Age from 33 to 34.
+  - But customer X complains that it needs some time to take effect.
+  - Currently system is using `Read-Aside` + `Write-Through` cache.
+  - The profile of customer X in cache is not updated yet.
+- **Cause**:
+    - `Cache` and `Database` are different systems.
+    - Database may write successfully, but cache may fail to update.
+    - Cache may return stale data.
+
+```bash
+┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+│   Client    │    │    Cache    │    │  Database   │
+└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
+       │                  │                  │
+       │ 1. UPDATE        │                  │
+       │    age: 33→34    │                  │
+       ├────────────────────────────────────►│
+       │                  │ 2. Success ✓     │
+       │◄────────────────────────────────────┤
+       │                  │                  │
+       │ 3. Update cache  │                  │
+       │     ✗ FAILS      │                  │
+       │─────────────────►│                  │
+       │                  │                  │
+       │ 4. GET user      │                  │
+       ├─────────────────►│                  │
+       │                  │                  │
+       │ 5. Return        │                  │
+       │    age: 33       │                  │
+       │    (STALE!)      │                  │
+       │◄─────────────────┤                  │
+       │                  │                  │
+```
+
+- **Solution**:
+    - Retry logic for cache update (Easy).
+    - Use a message queue to ensure cache updates are processed (Hard).
+
+### 3.1.2. Problem 02: Cache Avalanche
+
+- **Context**:
+  - Cache is down or cache entries or a "hot key" data are expired at the same time, 
+  - All requests hit the database, causing a surge in load, leading to potential downtime.
+- **Solution**:
+    - **Cache Clustering**: Use multiple cache nodes to distribute load.
+    - **Rate Limiting**: Limit the number of requests hitting the database during cache downtime.
+    - **Circuit Breaker Pattern**: Temporarily stop requests to the database when it is overloaded.
+    - **Even distribution** for TTL: Use a random TTL for cache entries to avoid simultaneous expiration.
+    - With hot keys, we can do background preloading of cache entries before they expire or update cache periodically.
+
+### 3.1.3. Problem 03: Cache Penetration
+
+- **Context**:
+  - A request for a non-existent key (e.g., user ID that does not exist) bypasses the cache and hits the database (It's also not in the database).
+  - This can lead to excessive load on the database with many requests for non-existent data.
+- **Solution**:
+    - **Cache Empty Responses**: Store a special marker in the cache for non-existent keys to prevent repeated database hits.
+    - **Bloom Filters**: Use a probabilistic data structure to quickly check if a key might exist before querying the cache or database.
+    - **Strong Validation**: Validate requests before hitting the cache or database to ensure they are for valid keys.
+
+## 3.2. High Traffic Challenges
+
+### 3.2.1. Problem 04: Cache Hot Keys
+
+- **Context**:
+  - A small number of keys receive a disproportionately high number of requests (e.g., popular product ID). But these key only in Node A in a distributed cache.
+- **Solution**:
+    - **Cache Warming** or **Copy hot key into multiple nodes**: Preload frequently accessed data into the cache before it is requested.
+    - **Local Caching**: Use local caches in each node to reduce the load on the central cache.
+
+### 3.2.2. Problem 05: Large Cache Size
+
+- **Context**:
+  - Cache size is too large, leading to high memory usage and potential performance degradation, may increase latency.
+- **Solution**:
+    - **Data Compression**: Compress data before storing it in the cache to reduce memory usage.
+
+## 3.3. What if the Cache DB is running out of memory?
+
+- Least Recently Used (LRU) eviction policy: Remove the least recently used items from the cache when it reaches its memory limit.
+- Least Frequently Used (LFU) eviction policy: Remove the least frequently accessed items from the cache.
 
 ## 4. Redis

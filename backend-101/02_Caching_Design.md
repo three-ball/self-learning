@@ -332,3 +332,52 @@ Data is written to cache immediately and asynchronously written to database late
 - Least Frequently Used (LFU) eviction policy: Remove the least frequently accessed items from the cache.
 
 ## 4. Redis
+
+### 4.1. Introduction
+
+- Redis is an open-source, **in-memory database**.
+- Various data structures: `strings`, `hashes`, `lists`, `sets`, `sorted sets`, ...
+- Supports caching, pub/sub messaging, multiple clustering modes, and persistence...
+- **Usecases**: Caching, key-value store, message queue, ...
+
+### 4.2. Architecture
+
+### 4.2.1. Master-Slave Replication
+
+- `Replication`: Data is written to the master node and then replicated to one or more slave nodes asynchronously. Data can be read from both master and slave nodes.
+
+![master slave replication](images/master_slave.jpg)
+
+- **Advantages**:
+    - Improved read scalability (read from slaves).
+- **Disadvantages**:
+    - Data inconsistency risk (slaves may lag behind).
+    - Failover issues (if master fails, a slave must be promoted).
+
+### 4.2.2. Sentinel
+
+- `Sentinel`: Provides high availability and monitoring for Redis. It can automatically promote a slave to master if the master fails.
+- When Master fails, Sentinel will select a new master from the slaves and update other slaves to replicate from the new master.
+
+![sentinel](images/sentinel.jpg)
+
+- **Advantages**:
+    - Automatic failover and monitoring.
+- **Disadvantages**:
+    - Data inconsistency.
+    - Operational overhead.
+    - All writes go to the master, which can become a bottleneck.
+
+### 4.2.3. Cluster
+
+- `Cluster`: Distributes data across multiple Redis nodes in different servers.
+
+![cluster](images/cluster.jpg)
+
+- **Advantages**:
+    - Sovlves failover issues.
+    - Reduce the system's dependency on a single master.
+    - Scalable read and write operations.
+- **Disadvantages**:
+    - Increased complexity.
+    - Operational overhead.

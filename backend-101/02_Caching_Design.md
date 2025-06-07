@@ -38,7 +38,6 @@ The cache is checked first, and if the data is not found, it is fetched from the
        │◄─────────────────┤                  │
        │                  │                  │
        │                  │                  │
-    Response Time: ~5ms
 ```
 
 - Cache miss:
@@ -50,25 +49,24 @@ The cache is checked first, and if the data is not found, it is fetched from the
        │ 1. GET user/456  │                  │
        ├─────────────────►│                  │
        │                  │                  │
-       │                  │ 2. Key not found │
-       │                  │    ✗ MISS        │
-       │                  │                  │
+       │ 2. Key not found │                  │
+       │    ✗ MISS        │                  │
+       │◄─────────────────┤                  │
        │                  │ 3. Query DB      │
-       │                  ├─────────────────►│
+       │────────────────────────────────────►│
        │                  │                  │
        │                  │ 4. Return data   │
-       │                  │◄─────────────────┤
+       │◄────────────────────────────────────┤
        │                  │                  │
-       │                  │ 5. Store in cache│
+       │ 5. Store in cache│                  │
+       │─────────────────►│                  │
        │                  │                  │
-       │ 6. Return data   │                  │
-       │◄─────────────────┤                  │
        │                  │                  │
-    Response Time: ~50ms
+       │                  │                  │
 ```
 
 - Advantages:
-    - Tolerate cache failures.
+    - Tolerate cache failures (cache is decoupled from database).
     - Flexible for data models.
 - Disadvantages:
     - Increased complexity.
@@ -93,7 +91,6 @@ The cache sits between the client and the database. When a cache miss occurs, th
        │ 3. Return data   │                  │
        │◄─────────────────┤                  │
        │                  │                  │
-    Response Time: ~5ms
 ```
 
 - Cache miss:
@@ -118,7 +115,6 @@ The cache sits between the client and the database. When a cache miss occurs, th
        │ 6. Return data   │                  │
        │◄─────────────────┤                  │
        │                  │                  │
-    Response Time: ~50ms
 ```
 
 - Advantages:
@@ -153,7 +149,6 @@ Data is written to both cache and database simultaneously. The write operation i
        │                  │                  │
        │ 5. Success       │                  │
        │◄─────────────────┤                  │
-    Response Time: ~25ms
 ```
 
 - Advantages:
@@ -169,21 +164,20 @@ Data is written to both cache and database simultaneously. The write operation i
 Data is written directly to the database, bypassing the cache. Cache is only populated on read misses. We may invalidate the cache entry after a write operation, but it is not mandatory.
 
 ```bash
-┌─────────────┐    ┌─────────────┐    ┌─────────────┐
-│   Client    │    │    Cache    │    │  Database   │
-└──────┬──────┘    └──────┬──────┘    └──────┬──────┘
-       │                  │                  │
-       │ 1. POST user/123 │                  │
-       ├─────────────────────────────────────►│
-       │                  │                  │
-       │                  │ 2. Write data    │
-       │                  │                  │
-       │ 3. Success       │                  │
-       │◄─────────────────────────────────────┤
-       │                  │                  │
-       │                  │ Cache remains    │
-       │                  │ unchanged        │
-    Response Time: ~20ms
+┌─────────────┐         ┌─────────────┐    ┌─────────────┐
+│   Client    │         │    Cache    │    │  Database   │
+└──────┬──────┘         └──────┬──────┘    └──────┬──────┘
+       │                       │                  │
+       │ 1. POST user/123      │                  │
+       ├─────────────────────────────────────────►│
+       │                       │                  │
+       │                       │ 2. Write data    │
+       │                       │                  │
+       │ 3. Success            │                  │
+       │◄─────────────────────────────────────────┤
+       │ 4. Invalidate cache   │                  │
+       │──────────────────────►│                  │
+       │                       │                  │
 ```
 
 - Advantages:
@@ -216,7 +210,6 @@ Data is written to cache immediately and asynchronously written to database late
        │                  │ 4. Async write   │
        │                  ├─────────────────►│
        │                  │    (batched)     │
-    Response Time: ~10ms
 ```
 
 - Advantages:
@@ -229,6 +222,23 @@ Data is written to cache immediately and asynchronously written to database late
     - Complex implementation.
     - Eventual consistency issues.
     - Requires robust error handling.
+
+### 2.3. Data Inconsistency
+
+- **Cache Invalidation**:
+    - **Time-based**: Set a TTL (Time To Live) for cache entries.
+    - **Command-based**: Application logic to invalidate cache entries when data changes.
+    - **Event-based**: Use events to trigger cache invalidation (e.g., message queues).
+    - **Group-based**: Invalidate all entries related to a specific key or pattern.
+
+- Why Cache Invalidation is Hard:
+    - **Timing**: How long enough for TTL?
+    - **Concurrency**: Race condition.
+    - **Data Relationships**: Complex relationships can lead to cascading invalidations.
+    - **Unlike Database, Cache can be everywhere and anywhere**: Hard to finding root causes.
+
+- Consider Solution: `Read-Aside` + `Write-Around` with invalidation: `DELETE cache`. (`RA-DWA`). It may remain data inconsistency for a short time, but it is acceptable in most cases.
+
 
 ## 3. Challenges
 

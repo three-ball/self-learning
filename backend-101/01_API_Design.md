@@ -1,5 +1,17 @@
 # 01. REST API Design
 
+## Table of Contents
+
+- [01. REST API Design](#01-rest-api-design)
+  - [Table of Contents](#table-of-contents)
+  - [1.1. Mindset](#11-mindset)
+  - [2.1 HTTP Methods](#21-http-methods)
+  - [2.2. Conventions](#22-conventions)
+  - [2.3. Pagination](#23-pagination)
+  - [2.4. Sorting](#24-sorting)
+  - [2.5. Some Usecases](#25-some-usecases)
+    - [2.5.1. Export heavy data](#251-export-heavy-data)
+
 ## 1.1. Mindset
 
 - Scalable.

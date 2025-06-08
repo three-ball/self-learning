@@ -24,3 +24,9 @@
 ## [4. AWS 101](/aws-101)
 
 - A note for AWS 101 course from CodeGym.
+
+## [5. Backend 101](/backend-101)
+
+- Notes on backend fundamentals:
+  - **API Design**: REST best practices, HTTP methods, pagination, sorting.
+  - **Caching Design**: Strategies, challenges, Redis architecture and use cases.

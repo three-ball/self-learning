@@ -1,5 +1,8 @@
 # 01. REST API Design
 
+> At the most basic level, an API is a mechanism that enables an application or service to access a resource within another application, service or database.
+> [What is REST API?](https://www.ibm.com/think/topics/rest-apis)
+
 ## Table of Contents
 
 - [01. REST API Design](#01-rest-api-design)

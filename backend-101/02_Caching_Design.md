@@ -1,5 +1,8 @@
 # 02. Caching Design
 
+> A Cache is a hardware or software component that stores data so that future requests for that data can be served faster.
+> [Cache](https://en.wikipedia.org/wiki/Cache_(computing))
+
 ## Table of Contents
 
 - [02. Caching Design](#02-caching-design)
@@ -50,7 +53,6 @@
 
 ## 1. Introduction
 
-- A Cache is a hardware or software component that stores data so that future requests for that data can be served faster.
 - The data in cache:
     - **A copy of frequently accessed data** from a slower storage layer (like a database).
     - **Computed results of expensive operations.**

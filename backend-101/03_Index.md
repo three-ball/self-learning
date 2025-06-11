@@ -130,6 +130,8 @@ Example: Multi-Column Index (`country`, `province`, `name`).
 
 ## 3. Best Practices
 
+### 3.1. When?
+
 > When to use indexes?
 
 - Read-heavy workloads: `WHERE`, `JOIN`, `ORDER BY`, `GROUP BY`, etc.
@@ -140,3 +142,44 @@ Example: Multi-Column Index (`country`, `province`, `name`).
 
 - Very low cardinality columns (e.g., boolean fields, gender fields).
 - Write-heavy workloads.
+
+- **Best practice**:
+  - Limit the number of indexes on a table to avoid performance degradation.
+  - The primary key index is preferably self-incrementing (e.g., `AUTO_INCREMENT` in MySQL).
+  - The index is best set to `NOT NULL`, because `NULL` is complicated to handle in indexes and can lead to performance issues.
+  - `Covering indexes` are recommended for queries that require multiple columns (reduce a lot of I/O operations).
+  - Regularly monitor and analyze query performance to identify potential indexing needs: B+Tree might become unbalanced over time, leading to performance degradation -> rebuild the index periodically.
+
+### 3.2. Failures index
+
+#### 3.2.1. Case 1: Index with `LIKE`
+
+> Index on `name` column
+
+- `SELECT * FROM users WHERE name LIKE '%JANE';` (❌)
+- `SELECT * FROM users WHERE name LIKE '%JANE%';` (❌)
+- `SELECT * FROM users WHERE name LIKE 'JANE%';` (✅)
+
+#### 3.2.2. Case 2: Index with `OR`
+
+> Index on `id` column
+
+- `SELECT * FROM users WHERE id = 1 OR age = 18;` (❌ - `INDEX` OR `NOT INDEX` -> Still scan the whole table).
+
+#### 3.2.3. Case 3: Type Conversion
+
+> Index on `age` column
+
+- if `age` is varchar: `SELECT * FROM users WHERE age = 18;` (❌ - `age` is converted to string, so it will scan the whole table).
+- if `age` is int: `SELECT * FROM users WHERE age = '18';` (✅ - `age` is converted to int, so it can use the index).
+
+**Because automatically convert the string to int, so it can use the index.**
+
+#### 3.2.5. Case 4: Index with calculated columns
+
+> Index on `age` column
+
+- `SELECT * FROM users WHERE age + 1 = 18;` (❌ - `age + 1` is a calculated column, so it will scan the whole table).
+- `SELECT * FROM users WHERE age = 17;` (✅ - `age` is a column, so it can use the index).
+
+**Because the index saves the original value of the column, not the value calculated by expression.**

@@ -30,3 +30,4 @@
 - Notes on backend fundamentals:
   - **API Design**: REST best practices, HTTP methods, pagination, sorting.
   - **Caching Design**: Strategies, challenges, Redis architecture and use cases.
+  - **SQL Indexing**: Indexing strategies, performance optimization, and query tuning.

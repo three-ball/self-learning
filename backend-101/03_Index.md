@@ -3,6 +3,45 @@
 > An index is a data structure that improves the speed of data retrieval operations on a database table at the cost of additional space and slower writes.
 > [Wikipedia](https://en.wikipedia.org/wiki/Index_(database))
 
+## Table of Contents
+
+- [03. Index](#03-index)
+  - [Table of Contents](#table-of-contents)
+  - [1. Introduction](#1-introduction)
+  - [2. Classification](#2-classification)
+    - [2.1. Data Structures](#21-data-structures)
+      - [2.1.1. B-Tree (Balanced Tree)](#211-b-tree-balanced-tree)
+      - [2.1.2. B+ Tree](#212-b-tree)
+      - [2.1.3. Hash Index](#213-hash-index)
+    - [2.2. Physical Storage](#22-physical-storage)
+      - [2.2.1. Clustered Index](#221-clustered-index)
+      - [2.2.2. Non-Clustered Index](#222-non-clustered-index)
+    - [2.3. Characteristics](#23-characteristics)
+      - [2.3.1. Primary Index](#231-primary-index)
+      - [2.3.2. Unique Index](#232-unique-index)
+    - [2.4. Columns](#24-columns)
+      - [2.4.1. Single-Column Index](#241-single-column-index)
+      - [2.4.2. Multi-Column Index](#242-multi-column-index)
+    - [2.4.3. Covering Index](#243-covering-index)
+  - [3. Best Practices](#3-best-practices)
+    - [3.1. When?](#31-when)
+    - [3.2. Failures index](#32-failures-index)
+      - [3.2.1. Case 1: Index with `LIKE`](#321-case-1-index-with-like)
+      - [3.2.2. Case 2: Index with `OR`](#322-case-2-index-with-or)
+      - [3.2.3. Case 3: Type Conversion](#323-case-3-type-conversion)
+      - [3.2.5. Case 4: Index with calculated columns](#325-case-4-index-with-calculated-columns)
+  - [4. Query Optimization (PostgreSQL)](#4-query-optimization-postgresql)
+    - [4.1. Direct Query Optimization](#41-direct-query-optimization)
+      - [4.1.1. Execute plan](#411-execute-plan)
+      - [4.1.2. Types of Scanning](#412-types-of-scanning)
+      - [4.1.3. Reading Execution Plan](#413-reading-execution-plan)
+  - [5. Some self notes](#5-some-self-notes)
+    - [5.1. Multicolumn Indexes](#51-multicolumn-indexes)
+    - [5.2. Syntax](#52-syntax)
+    - [5.3. What the heck is a multicolumn index?](#53-what-the-heck-is-a-multicolumn-index)
+    - [5.4 Example](#54-example)
+    - [5.5 Performance](#55-performance)
+
 ## 1. Introduction
 
 - Indexes are used to speed up data retrieval operations in databases.
@@ -183,3 +222,97 @@ Example: Multi-Column Index (`country`, `province`, `name`).
 - `SELECT * FROM users WHERE age = 17;` (✅ - `age` is a column, so it can use the index).
 
 **Because the index saves the original value of the column, not the value calculated by expression.**
+
+## 4. Query Optimization (PostgreSQL)
+
+### 4.1. Direct Query Optimization
+
+#### 4.1.1. Execute plan
+
+- An **execution plan** is a detailed, step-by-step description of how a database engine will execute a query.
+- Syntax:
+  - `EXPLAIN`: get basic information about the execution plan.
+  - `ANALYZE`: get more concrete information about the execution plan, including actual execution time and row counts.
+  - `BUFFER`: get information about cache hit/miss statistics.
+  - `FORMAT`: specify the output format (e.g., `JSON`, `TEXT`, etc.).
+  - Example: `EXPLAIN (ANALYZE, BUFFERS, FORMAT JSON) SELECT * FROM users WHERE age = 18;`
+
+```SQL
+EXPLAIN ANALYZE
+SELECT
+    *
+FROM
+    "MacAddresses" ma
+WHERE
+    mac_address = '30600ada759f';                                               
+```
+
+#### 4.1.2. Types of Scanning
+
+- Sequential Scan: Scans the entire table row by row without using an index.
+  - Parallel Sequential Scan: Uses multiple threads to scan the table in parallel.
+- Index Scan: Uses an index to quickly locate rows.
+- Index only Scan: Uses a covering index to retrieve all required columns without accessing the table.
+- Bitmap Index Scan + Bitmap Heap Scan: Combines multiple index scans into a bitmap, then retrieves rows from the table.
+
+#### 4.1.3. Reading Execution Plan
+
+- Estimated Values:
+  - `Startup Cost`: The estimated cost of the initial setup before the first row is returned.
+  - `Total Cost`: The estimated cost of executing the entire query.
+  - `Plan Rows`: The estimated number of rows that will be returned by the query.
+  - `Plan Width`: The estimated average width (in bytes) of each row returned by the query.
+- Actual Values:
+  - `Actual Startup Time`: The actual time taken to start returning the first row.
+  - `Actual Total Time`: The actual time taken to execute the entire query.
+  - `Actual Rows`: The actual number of rows returned by the query.
+  - `Actual Loops`: The number of times the operation was executed (useful for nested loops).
+
+## 5. Some self notes
+
+
+### 5.1. Multicolumn Indexes
+
+> Multicolumn indexes (also known as composite indexes) are similar to standard indexes. They both store a sorted "table" of pointers to the main table. Multicolumn indexes however can store additional sorted pointers to other columns.
+
+**References**: [Multicolumn Indexes](https://www.atlassian.com/data/sql/multicolumn-indexes)
+
+### 5.2. Syntax
+
+```sql
+CREATE INDEX [index name]
+ON [Table name]([column1, column2, column3,...]);
+```
+
+### 5.3. What the heck is a multicolumn index?
+
+- Multicolumn indexes are indexes that store data on up to 32 columns.
+- When creating a multicolumn index, **the column order is very important.**
+- Multicolumn indexes are structured to have `a hierarchical structure`.
+
+### 5.4 Example
+
+![alt text](images/original_table.png)
+
+Multi-column index will look like this if we create index on (`year`, `make`, `model`):
+
+![alt text](images/multiconlumn_index.png)
+
+- In a three column index we can see that the main index `year` stores pointers to both the original table and the reference table on `make`, which in turn has pointers to the reference table on `model`.
+- Query step:
+    - The query will first look at the `year` index to find the correct `year`.
+    - The main index also has a pointer to the secondary index where the related `make` is stored.
+    - The secondary index in term has a pointer to the tertiary index.
+- Because of this pointer ordering, in order to access the secondary index, it has to be **done through the main index**. 
+- This means that this multicolumn index can be used for queries that filter by just `year`, `year and make`, or `year, make, and model`.
+- The multicolumn index **cannot be used for queries just on the `make` or `model` of the car because the pointers are inaccessible.**
+
+### 5.5 Performance
+
+- A `normal index` versus a `multicolumn index`: There is little to no difference when sorting by just the first column `year`.
+
+![alt text](images/normal_index_vs_m_index_1st_col.png)
+
+- However, when sorting by the multiple column `year, make, and model`, the multicolumn index is much faster.
+
+![alt text](images/normal_index_vs_m_index_3_cols.png)

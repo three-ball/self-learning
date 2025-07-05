@@ -41,6 +41,19 @@
     - [5.3. What the heck is a multicolumn index?](#53-what-the-heck-is-a-multicolumn-index)
     - [5.4 Example](#54-example)
     - [5.5 Performance](#55-performance)
+  - [6. Practical Example](#6-practical-example)
+    - [6.1. Schema](#61-schema)
+    - [6.2. Reading Execution Plan](#62-reading-execution-plan)
+      - [6.2.1. Single column condition](#621-single-column-condition)
+        - [6.2.1.1. Simple select](#6211-simple-select)
+        - [6.2.1.2. With Single-Column Index](#6212-with-single-column-index)
+        - [6.2.1.3. With Multi-Column Index](#6213-with-multi-column-index)
+      - [6.2.2. Multi-column condition](#622-multi-column-condition)
+        - [6.2.2.1. Simple select](#6221-simple-select)
+        - [6.2.2.2. With Single-Column Index](#6222-with-single-column-index)
+        - [6.2.2.3. With Multi-Column Index](#6223-with-multi-column-index)
+    - [6.3. Questions](#63-questions)
+  
 
 ## 1. Introduction
 
@@ -316,3 +329,405 @@ Multi-column index will look like this if we create index on (`year`, `make`, `m
 - However, when sorting by the multiple column `year, make, and model`, the multicolumn index is much faster.
 
 ![alt text](images/normal_index_vs_m_index_3_cols.png)
+
+## 6. Practical Example
+
+### 6.1. Schema
+
+- Schema: [`tickets`](infras/dummy-data-generator/tickets.sql)
+- Dummy data generator: [`dummy-data-generator`](infras/dummy-data-generator/README.md)
+
+```sql
+CREATE TABLE tickets (
+    id BIGSERIAL PRIMARY KEY,
+    ticket_number VARCHAR(20) UNIQUE NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+    category VARCHAR(50) NOT NULL,
+    user_id BIGINT NOT NULL,
+    assigned_to BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    due_date TIMESTAMP,
+    tags TEXT[],
+    metadata JSONB,
+    is_escalated BOOLEAN DEFAULT FALSE,
+    customer_satisfaction_score INTEGER CHECK (customer_satisfaction_score >= 1 AND customer_satisfaction_score <= 5),
+    response_time_hours INTEGER,
+    resolution_time_hours INTEGER
+);
+```
+
+### 6.2. Reading Execution Plan
+
+#### 6.2.1. Single column condition
+
+##### 6.2.1.1. Simple select:
+
+```sql 
+EXPLAIN ANALYSE SELECT
+	*
+FROM
+	tickets
+WHERE ticket_number = 'TK-011273';
+
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- Gather  (cost=1000.00..236015.13 rows=1 width=397) (actual time=3.423..201.286 rows=1 loops=1)                              |
+--   Workers Planned: 2                                                                                                        |
+--   Workers Launched: 2                                                                                                       |
+--   ->  Parallel Seq Scan on tickets  (cost=0.00..235015.03 rows=1 width=397) (actual time=120.643..185.034 rows=0 loops=3)   |
+--         Filter: ((ticket_number)::text = 'TK-011273'::text)                                                                 |
+--         Rows Removed by Filter: 1333333                                                                                     |
+-- Planning Time: 0.047 ms                                                                                                     |
+-- JIT:                                                                                                                        |
+--   Functions: 6                                                                                                              |
+--   Options: Inlining false, Optimization false, Expressions true, Deforming true                                             |
+--   Timing: Generation 0.418 ms (Deform 0.127 ms), Inlining 0.000 ms, Optimization 0.290 ms, Emission 5.121 ms, Total 5.829 ms|
+-- Execution Time: 201.446 ms                                                                                                  |
+```
+
+- Scan type: `Parallel Seq Scan` (sequential scan).
+- Execution time: `201.446 ms`.
+- Plan worker: `Workers Planned: 2`, `Workers Launched: 2` -> total of `3` workers (1 main + 2 parallel workers).
+- Each worker processed **1,333,333 rows** and removed them by filter (i.e., they did not match `ticket_number = 'TK-011273'`) -> total of `4,000,000` rows in the table.(true, count(*) return `4000000` rows).
+- Filter: `((ticket_number)::text = 'TK-011273'::text)` -> the filter is applied on the `ticket_number` column.
+- Started: `3.423 ms`, finished: `201.286 ms`.
+- Startup cost: `1000.00`, total cost: `236015.13`.
+- JIT (Just-In-Time compilation) is enabled, which can improve performance for complex queries by compiling parts of the query at runtime. Overhead: `5.829 ms`.
+
+##### 6.2.1.2. With Single-Column Index
+
+```sql
+CREATE INDEX idx_ticket_number ON tickets(ticket_number);
+```
+
+```sql
+EXPLAIN ANALYSE SELECT
+	*
+FROM
+	tickets
+WHERE ticket_number = 'TK-111273';
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- Index Scan using idx_ticket_number on tickets  (cost=0.43..8.45 rows=1 width=397) (actual time=0.025..0.025 rows=1 loops=1)|
+--   Index Cond: ((ticket_number)::text = 'TK-111273'::text)                                                                  |
+-- Planning Time: 0.096 ms                                                                                                    |
+-- Execution Time: 0.036 ms                                                                                                   |
+```
+
+- Scan type: `Index Scan using idx_ticket_number`.
+- Execution time: `0.036 ms`.
+- Index condition: `((ticket_number)::text = 'TK-111273'::text)`.
+- Started: `0.025 ms`, finished: `0.025 ms`.
+- Startup cost: `0.43`, total cost: `8.45`.
+- Execution time is significantly reduced to `0.036 ms` due to the index.
+
+##### 6.2.1.3. With Multi-Column Index
+
+```sql
+CREATE INDEX idx_ticket_number_status ON tickets(ticket_number, status, priority);
+```
+
+```sql
+EXPLAIN ANALYSE SELECT
+  *
+FROM
+  tickets
+WHERE ticket_number = 'TK-111273';
+
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- QUERY PLAN                                                                                                                        |
+----------------------------------------------------------------------------------------------------------------------------------+
+-- Index Scan using idx_ticket_number_status on tickets  (cost=0.43..8.45 rows=1 width=397) (actual time=0.019..0.020 rows=1 loops=1)|
+--   Index Cond: ((ticket_number)::text = 'TK-111273'::text)                                                                         |
+-- Planning Time: 0.056 ms                                                                                                           |
+-- Execution Time: 0.031 ms                                                                                                          |
+```
+
+** Summary: **
+| Scenario | Scan Type | Execution Time | Startup Cost | Total Cost | Rows Scanned | Performance Notes |
+|----------|-----------|----------------|--------------|------------|--------------|------------------|
+| **No Index** | Parallel Seq Scan | 201.446 ms | 1000.00 | 236015.13 | 4,000,000 | 3 workers, scanned entire table |
+| **Single-Column Index** | Index Scan | 0.036 ms | 0.43 | 8.45 | 1 | Direct index lookup |
+| **Multi-Column Index** | Index Scan | 0.031 ms | 0.43 | 8.45 | 1 | Uses first column of composite index |
+
+```mermaid
+xychart-beta
+    title "Single Column Query Performance Comparison (Execution Time in ms)"
+    x-axis ["No Index", "Single-Column Index", "Multi-Column Index"]
+    y-axis "Execution Time (ms)" 0 --> 250
+    bar [201.446, 0.036, 0.031]
+```
+
+#### 6.2.2. Multi-column condition
+
+##### 6.2.2.1. Simple select:
+
+```sql
+EXPLAIN ANALYSE SELECT
+  *
+  FROM
+  tickets
+WHERE status = 'open' AND priority = 'medium' and category = 'bug' and assigned_to = 396;
+
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- Gather  (cost=1000.00..248522.83 rows=35 width=397) (actual time=11.578..269.236 rows=40 loops=1)                                                     |
+--   Workers Planned: 2                                                                                                                                  |
+--   Workers Launched: 2                                                                                                                                 |
+--   ->  Parallel Seq Scan on tickets  (cost=0.00..247519.33 rows=15 width=397) (actual time=39.934..252.894 rows=13 loops=3)                            |
+--         Filter: (((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text) AND (assigned_to = 396))|
+--         Rows Removed by Filter: 1333320                                                                                                               |
+-- Planning Time: 0.060 ms                                                                                                                               |
+-- JIT:                                                                                                                                                  |
+--   Functions: 6                                                                                                                                        |
+--   Options: Inlining false, Optimization false, Expressions true, Deforming true                                                                       |
+--   Timing: Generation 0.745 ms (Deform 0.277 ms), Inlining 0.000 ms, Optimization 0.462 ms, Emission 8.186 ms, Total 9.393 ms                          |
+-- Execution Time: 269.486 ms                                                                                                                            |
+```
+
+- Scan type: `Parallel Seq Scan` (sequential scan).
+- Execution time: `269.486 ms`.
+- Plan worker: `Workers Planned: 2`, `Workers Launched: 2` -> total of `3` workers (1 main + 2 parallel workers).
+- Each worker processed **1,333,320 rows** and removed them by filter (i.e., they did not match `status = 'open' AND priority = 'medium' AND category = 'bug' AND assigned_to = 396`) -> total of `4,000,000` rows in the table (true, count(*) return `4000000` rows).
+- Filter: `(((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text) AND (assigned_to = 396))`.
+- Rows removed by filter: `1,333,320` (the rows did not match the condition).
+- Started: `11.578 ms`, finished: `269.236 ms`.
+- Startup cost: `1000.00`, total cost: `248522.83`.
+- JIT (Just-In-Time compilation) is enabled, which can improve performance for complex queries by compiling parts of the query at runtime. Overhead: `9.393 ms`.
+
+##### 6.2.2.2. With Single-Column Index
+
+```sql
+CREATE INDEX idx_status ON tickets(status);
+```
+
+```sql
+EXPLAIN ANALYSE SELECT
+  *
+  FROM
+  tickets
+WHERE status = 'open' AND priority = 'medium' and category = 'bug' and assigned_to = 396;
+
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- QUERY PLAN                                                                                                                 |
+---------------------------------------------------------------------------------------------------------------------------+
+-- Gather  (cost=1000.00..248522.83 rows=35 width=397) (actual time=11.521..268.596 rows=40 loops=1)                                                     |
+--   Workers Planned: 2                                                                                                                                  |
+--   Workers Launched: 2                                                                                                                                 |
+--   ->  Parallel Seq Scan on tickets  (cost=0.00..247519.33 rows=15 width=397) (actual time=23.569..252.211 rows=13 loops=3)                            |
+--         Filter: (((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text) AND (assigned_to = 396))|
+--         Rows Removed by Filter: 1333320                                                                                                               |
+-- Planning Time: 0.067 ms                                                                                                                               |
+-- JIT:                                                                                                                                                  |
+--   Functions: 6                                                                                                                                        |
+--   Options: Inlining false, Optimization false, Expressions true, Deforming true                                                                       |
+--   Timing: Generation 0.742 ms (Deform 0.276 ms), Inlining 0.000 ms, Optimization 0.471 ms, Emission 8.193 ms, Total 9.407 ms                          |
+-- Execution Time: 268.840 ms                                                                                                                            |
+```
+
+- Scan type: `Parallel Seq Scan` (sequential scan).
+- Execution time: `268.840 ms`.
+- Plan worker: `Workers Planned: 2`, `Workers Launched: 2` -> total of `3` workers (1 main + 2 parallel workers).
+- Each worker processed **1,333,320 rows** and removed them by filter (i.e., they did not match `status = 'open' AND priority = 'medium' AND category = 'bug' AND assigned_to = 396`) -> total of `4,000,000` rows in the table (true, count(*) return `4000000` rows).
+- Filter: `(((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text) AND (assigned_to = 396))`.
+- Rows removed by filter: `1,333,320` (the rows did not match the condition).
+- Started: `11.521 ms`, finished: `268.596 ms`.
+- Startup cost: `1000.00`, total cost: `248522.83`.
+- JIT (Just-In-Time compilation) is enabled, which can improve performance for complex queries by compiling parts of the query at runtime. Overhead: `9.407 ms`.
+
+**Notes**:  single-column index on status is not being used due to: PostgreSQL's query optimizer making a cost-based decision: 
+- Low Selectivity of `status` Column.
+- Cost-Based Optimization.
+- Multiple Filter Conditions.
+
+- More test: We will create one more sigle-column index on `assigned_to` column.
+
+```sql
+CREATE INDEX idx_assigned_to ON tickets(assigned_to);
+```
+
+PostgreSQL now has **two indexes** available:
+- `idx_status` (on `status` column)
+- `idx_assigned_to` (on `assigned_to` column)
+
+
+```sql
+EXPLAIN ANALYSE SELECT
+  *
+  FROM
+  tickets
+WHERE status = 'open' AND priority = 'medium' and category = 'bug' and assigned_to = 396;
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- Bitmap Heap Scan on tickets  (cost=8789.02..13030.02 rows=35 width=397) (actual time=43.620..55.454 rows=40 loops=1)                  |
+--   Recheck Cond: ((assigned_to = 396) AND ((status)::text = 'open'::text))                                                             |
+--   Rows Removed by Index Recheck: 3377                                                                                                 |
+--   Filter: (((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text))                                                  |
+--   Rows Removed by Filter: 1095                                                                                                        |
+--   Heap Blocks: exact=4458                                                                                                             |
+--   ->  BitmapAnd  (cost=8789.02..8789.02 rows=1117 width=0) (actual time=42.761..42.762 rows=0 loops=1)                                |
+--         ->  Bitmap Index Scan on idx_assigned_to  (cost=0.00..62.32 rows=5586 width=0) (actual time=0.537..0.538 rows=5568 loops=1)   |
+--               Index Cond: (assigned_to = 396)                                                                                         |
+--         ->  Bitmap Index Scan on idx_status  (cost=0.00..8726.43 rows=799733 width=0) (actual time=42.025..42.025 rows=800202 loops=1)|
+--               Index Cond: ((status)::text = 'open'::text)                                                                             |
+-- Planning Time: 0.131 ms                                                                                                               |
+-- Execution Time: 55.474 ms                                                                                                             |
+```
+
+- **Notes**:
+  - **Bitmap Index Scan**: this is the primary index scan, that creates a bitmap array. This operation does not get the actual row values, but creates a bitmap array with the **heap-page locations of the rows**. There can be multiple such operations.
+  - **Bitmap Heap Scan**: this is the final operation in the plan tree, that uses the previously created bitmap arrays from the earlier stage to **fetch the actual row values**.
+  - When several "Bitmap Index Scan" are applied, `BitmapAnd` or `BitmapOr` logical operations are also used against the created bitmap arrays. **Their purpose is to help creating the final bitmap array (result array)**, which is then passed to the "Bitmap Heap Scan" node.
+  - Bitmap scanning can be considered as a **"middle ground"** between the sequential scan and index scan methods
+
+- Scan type: `Bitmap Heap Scan`.
+- Execution time: `55.474 ms`.
+- Started: `43.620 ms`, finished: `55.454 ms`.
+- Startup cost: `8789.02`, total cost: `13030.02`.
+
+````mermaid
+graph TD
+    A[Query: WHERE status='open' AND priority='medium' AND category='bug' AND assigned_to=396] --> B[PostgreSQL Optimizer Decision]
+    
+    B --> C[Use Both Indexes with BitmapAnd]
+    
+    C --> D[Bitmap Index Scan on idx_assigned_to]
+    C --> E[Bitmap Index Scan on idx_status]
+    
+    D --> F[Creates Bitmap A: 5,568 rows where assigned_to=396]
+    E --> G[Creates Bitmap B: 800,202 rows where status='open']
+    
+    F --> H[BitmapAnd Operation]
+    G --> H
+    
+    H --> I[Combined Bitmap: ~4,500 rows matching BOTH conditions]
+    
+    I --> J[Bitmap Heap Scan]
+    J --> K[Read actual table rows from combined bitmap]
+    
+    K --> L[Apply remaining filters: priority='medium' AND category='bug']
+    L --> M[Final Result: 40 rows]
+    
+    style D fill:#e1f5fe
+    style E fill:#e1f5fe
+    style H fill:#fff3e0
+    style J fill:#f3e5f5
+    style M fill:#e8f5e8
+````
+
+##### 6.2.2.3. With Multi-Column Index
+
+```sql
+CREATE INDEX idx_assigned_to_status_priority_category ON tickets(assigned_to, status, priority,category);
+```
+
+```sql
+EXPLAIN ANALYSE SELECT
+  *
+  FROM
+  tickets
+where  assigned_to = 396 and status = 'open' AND priority = 'medium' and category = 'bug';
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+Index Scan using idx_assigned_to_status_priority_category on tickets  (cost=0.43..145.30 rows=35 width=397) (actual time=0.019..0.049 rows=40 loops=1)|
+  Index Cond: ((assigned_to = 396) AND ((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text))  |
+Planning Time: 0.141 ms                                                                                                                               |
+Execution Time: 0.062 ms                                                                                                                              |
+```
+- Scan type: `Index Scan using idx_assigned_to_status_priority_category`.
+- Execution time: `0.062 ms`.
+- Index condition: `((assigned_to = 396) AND ((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text))`.
+- Started: `0.019 ms`, finished: `0.049 ms`.
+- Startup cost: `0.43`, total cost: `145.30`.
+
+**Summary:**
+| Scenario | Scan Type | Execution Time | Startup Cost | Total Cost | Rows Scanned | Index Strategy | Performance Notes |
+|----------|-----------|----------------|--------------|------------|--------------|----------------|------------------|
+| **No Index** | Parallel Seq Scan | 269.486 ms | 1000.00 | 248522.83 | 4,000,000 | None | Full table scan with 3 workers |
+| **Single Index (status)** | Parallel Seq Scan | 268.840 ms | 1000.00 | 248522.83 | 4,000,000 | Index ignored | Low selectivity, optimizer chose seq scan |
+| **Two Indexes (status + assigned_to)** | Bitmap Heap Scan | 55.474 ms | 8789.02 | 13030.02 | ~4,500 | Bitmap AND | Combined both indexes with bitmap operation |
+| **Multi-Column Index** | Index Scan | 0.062 ms | 0.43 | 145.30 | 40 | Direct index lookup | Perfect match for all 4 conditions |
+
+
+```mermaid
+xychart-beta
+    title "Query Performance Comparison (Execution Time in ms)"
+    x-axis ["No Index", "Single Index", "Two Indexes", "Multi-Column Index"]
+    y-axis "Execution Time (ms)" 0 --> 300
+    bar [269.486, 268.840, 55.474, 0.062]
+```
+
+### 6.3. Questions
+
+#### 6.3.1. What if I select 1st column of multi-column index and use `WHERE` clause on remain column?
+
+```sql
+CREATE INDEX idx_assigned_to_status_priority_category ON tickets(assigned_to, status, priority,category);
+```
+
+```sql
+EXPLAIN ANALYSE SELECT
+  assigned_to
+  FROM
+  tickets
+where  status = 'open' AND priority = 'medium' and category = 'bug';
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- QUERY PLAN                                                                                                                                                        |
+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+-- Index Only Scan using idx_assigned_to_status_priority_category on tickets  (cost=0.43..79189.37 rows=24938 width=8) (actual time=0.024..15.277 rows=25178 loops=1)|
+--   Index Cond: ((status = 'open'::text) AND (priority = 'medium'::text) AND (category = 'bug'::text))                                                              |
+--   Heap Fetches: 3586                                                                                                                                              |
+-- Planning Time: 0.056 ms                                                                                                                                           |
+-- Execution Time: 15.865 ms                                                                                                                                         |
+```
+
+> PostgreSQL can use a multi-column index even if you skip the left-most column in the WHERE clause, but it has to scan the index for all values of the omitted column(s), so it’s less efficient than if you included them. If all columns referenced are in the index, you get an Index Only Scan.
+
+```sql
+EXPLAIN ANALYSE SELECT
+  assigned_to, user_id
+  FROM
+  tickets
+where  status = 'open' AND priority = 'medium' and category = 'bug';
+-----------------------------------
+-- Output:
+-- ----------------------------------------------------------------------------------------------------------------------------+
+-- QUERY PLAN                                                                                                                                                        |
+------------------------------------------------------------------------------------------------------------------------------------------------------------------+
+-- Bitmap Heap Scan on tickets  (cost=65574.66..136826.96 rows=24938 width=16) (actual time=18.419..81.124 rows=25178 loops=1)                                  |
+--   Recheck Cond: (((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text))                               |
+--   Heap Blocks: exact=23810                                                                                                                                   |
+--   ->  Bitmap Index Scan on idx_assigned_to_status_priority_category  (cost=0.00..65568.43 rows=24938 width=0) (actual time=11.992..11.992 rows=25178 loops=1)|
+--         Index Cond: (((status)::text = 'open'::text) AND ((priority)::text = 'medium'::text) AND ((category)::text = 'bug'::text))                           |
+-- Planning Time: 0.056 ms                                                                                                                                      |
+-- JIT:                                                                                                                                                         |
+--   Functions: 4                                                                                                                                               |
+--   Options: Inlining false, Optimization false, Expressions true, Deforming true                                                                              |
+--   Timing: Generation 0.277 ms (Deform 0.161 ms), Inlining 0.000 ms, Optimization 0.212 ms, Emission 3.169 ms, Total 3.657 ms                                 |
+-- Execution Time: 82.664 ms                                                                                                                                    |
+```
+
+- Key change from your previous query: You are now selecting `user_id`, which is not part of the index.
+- Bitmap Index Scan: Scans the index for all rows where status, priority, and category match.
+- Bitmap Heap Scan:
+  - Uses the bitmap to fetch the actual rows from the table ("heap").
+  - Recheck and Fetches `user_id` from the table (because `user_id` is not in the index).
+- **Why Not Index Only Scan?** Index Only Scan is only possible if all columns needed (in SELECT and WHERE) are present in the index.
+
+> `The second case` = `the first case` + `fetch actual row (to get user_id).`

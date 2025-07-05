@@ -1,0 +1,21 @@
+CREATE TABLE tickets (
+    id BIGSERIAL PRIMARY KEY,
+    ticket_number VARCHAR(20) NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    description TEXT,
+    status VARCHAR(20) NOT NULL DEFAULT 'open',
+    priority VARCHAR(10) NOT NULL DEFAULT 'medium',
+    category VARCHAR(50) NOT NULL,
+    user_id BIGINT NOT NULL,
+    assigned_to BIGINT,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    due_date TIMESTAMP,
+    tags TEXT[],
+    metadata JSONB,
+    is_escalated BOOLEAN DEFAULT FALSE,
+    customer_satisfaction_score INTEGER CHECK (customer_satisfaction_score >= 1 AND customer_satisfaction_score <= 5),
+    response_time_hours INTEGER,
+    resolution_time_hours INTEGER
+);

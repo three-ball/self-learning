@@ -27,7 +27,7 @@
 
 ## 2.1 HTTP Methods
 
-> REST APIs are built on top of HTTP, which provides a sest of methods to interact with resources. Each method has specific characteristics that determine how it should be used.
+> REST APIs are built on top of HTTP, which provides a sets of methods to interact with resources. Each method has specific characteristics that determine how it should be used.
 
 - Properties:
   - Idempotency: A same request can be repeated multiple times without changing the result.

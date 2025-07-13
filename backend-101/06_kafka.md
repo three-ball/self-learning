@@ -222,3 +222,5 @@ graph TD
   - The default replication factor is 1, which means no replication. Replicattion factor should be greater than 1 and less than the size of the cluster.
 - **Leader and Follower**:
   - Each partition has one leader and zero or more followers.
+  - Producer only sends messages to the leader.
+  - Consumers read from the leader replica by default.

@@ -45,14 +45,15 @@
     - [6.1. Schema](#61-schema)
     - [6.2. Reading Execution Plan](#62-reading-execution-plan)
       - [6.2.1. Single column condition](#621-single-column-condition)
-        - [6.2.1.1. Simple select](#6211-simple-select)
+        - [6.2.1.1. Simple select:](#6211-simple-select)
         - [6.2.1.2. With Single-Column Index](#6212-with-single-column-index)
         - [6.2.1.3. With Multi-Column Index](#6213-with-multi-column-index)
       - [6.2.2. Multi-column condition](#622-multi-column-condition)
-        - [6.2.2.1. Simple select](#6221-simple-select)
+        - [6.2.2.1. Simple select:](#6221-simple-select)
         - [6.2.2.2. With Single-Column Index](#6222-with-single-column-index)
         - [6.2.2.3. With Multi-Column Index](#6223-with-multi-column-index)
     - [6.3. Questions](#63-questions)
+      - [6.3.1. What if I select 1st column of multi-column index and use `WHERE` clause on remain column?](#631-what-if-i-select-1st-column-of-multi-column-index-and-use-where-clause-on-remain-column)
   
 
 ## 1. Introduction
@@ -334,8 +335,8 @@ Multi-column index will look like this if we create index on (`year`, `make`, `m
 
 ### 6.1. Schema
 
-- Schema: [`tickets`](infras/dummy-data-generator/tickets.sql)
-- Dummy data generator: [`dummy-data-generator`](infras/dummy-data-generator/README.md)
+- Schema: [`tickets`](infras/posgresql/dummy-data-generator/tickets.sql)
+- Dummy data generator: [`dummy-data-generator`](infras/posgresql/dummy-data-generator/README.md)
 
 ```sql
 CREATE TABLE tickets (

@@ -224,3 +224,134 @@ graph TD
   - Each partition has one leader and zero or more followers.
   - Producer only sends messages to the leader.
   - Consumers read from the leader replica by default.
+
+## Producer
+
+### ACK
+
+- ACK is a signal sent from receiver indicating tht a mesasge has been received.
+- ACKS is the number of acknowledgments the producer requires the leader to receive before considering a request complete.
+
+### ACKS = 0
+
+- The producer does not wait for any acknowledgment from the broker.
+- Just fire and forget.
+- **Pros**:
+  - Fastest option, no waiting for acknowledgment.
+- **Cons**:
+  - Durability: weakest.
+  - Message may be lost if the broker fails before it is written to disk.
+  - No offset is not returned, so the producer cannot track the message.
+- Use case: when you don't care about message durability and just want to send messages as fast as possible. Some metrics from IoT devices, Non-essential logs, etc.
+- Records will still be replicated asynchronously.
+
+```mermaid
+sequenceDiagram
+    participant P as 📤 Producer
+    participant L as 🏢 Leader Broker
+    participant F1 as 🔄 Follower 1
+    participant F2 as 🔄 Follower 2
+    
+    Note over P,F2: ACKS = 0 (Fire and Forget)
+    
+    P->>L: 1. Send Message
+    Note right of P: No waiting for ACK
+    P->>P: 2. Continue immediately ⚡
+    Note right of P: Fastest throughput
+    
+    L-->>F1: 3. Async replication
+    L-->>F2: 4. Async replication
+    
+    Note over L,F2: Replication happens in background<br/>Risk: Message lost if leader fails
+```
+
+### ACKS = 1
+
+- The producer waits for the leader to acknowledge the message.
+- **Pros**:
+  - Faster than ACKS = all.
+  - Offset is returned, so the producer can track the message.
+- **Cons**:
+  - Durability: moderate.
+  - If the leader fails after acknowledging the message but before it is replicated to followers, the message may be lost.
+- **Use cases**: User activity logs, non-critical data that can be lost without significant impact.
+
+```mermaid
+sequenceDiagram
+    participant P as 📤 Producer
+    participant L as 🏢 Leader Broker
+    participant F1 as 🔄 Follower 1
+    participant F2 as 🔄 Follower 2
+    
+    Note over P,F2: ACKS = 1 (Leader ACK)
+    
+    P->>L: 1. Send Message
+    L->>L: 2. Write to log
+    L->>P: 3. ACK (offset=123) ✅
+    Note right of P: Gets offset for tracking
+    
+    L-->>F1: 4. Async replication
+    L-->>F2: 5. Async replication
+    
+    Note over L,F2: Risk: If leader fails before replication<br/>message could be lost
+```
+
+
+### ACKS = all (or -1)
+
+- The producer waits for all in-sync replicas (ISRs) to acknowledge the message.
+- Replication is synchronous.
+- **Pros**:
+  - Highest durability.
+  - Guarantees that the message is written to all replicas before considering the request complete.
+- **Cons**:
+  - Slowest option, as it waits for all replicas to acknowledge.
+  - Higher latency due to waiting for multiple acknowledgments.
+- **Use cases**: Critical data that must be durable and available, such as financial transactions, order processing, etc.
+
+```mermaid
+sequenceDiagram
+    participant P as 📤 Producer
+    participant L as 🏢 Leader Broker
+    participant F1 as 🔄 Follower 1
+    participant F2 as 🔄 Follower 2
+    
+    Note over P,F2: ACKS = all (Maximum Durability)
+    
+    P->>L: 1. Send Message
+    L->>L: 2. Write to log
+    
+    par Sync Replication
+        L->>F1: 3. Replicate message
+        F1->>L: 4. ACK from F1 ✅
+    and
+        L->>F2: 5. Replicate message
+        F2->>L: 6. ACK from F2 ✅
+    end
+    
+    L->>P: 7. Final ACK (offset=123) ✅
+    Note right of P: All ISRs confirmed<br/>Highest durability
+    
+    Note over L,F2: All replicas have the message<br/>Safe even if leader fails
+```
+
+### Retries
+
+- Types of errors that producer can encounter:
+  - **Transient errors**: Temporary issues that can be retried, such as network failures, broker unavailability, etc.
+    - LEADER_NOT_AVAILABLE
+    - network errors
+  - **Non-transient errors**: Permanent issues that cannot be retried, such as invalid messages, schema validation errors, etc.
+    - INVALID_MESSAGE
+    - IVALID_CONFIG
+    - Too large message
+- 2 types of retries:
+  - **Automatic retries**: retry N times then give up.
+  - **Manual retries**.
+- Some metric can be used when retrying:
+  - `retries`: Number of retries.
+  - `retry.backoff.ms`: Time to wait before retrying.
+  - `delivery.timeout.ms`: Maximum time to wait for a message to be delivered.
+- **Issues**:
+  - Duplicate messages: If a message is retried, it may be sent multiple times. This can lead to duplicate processing in the consumer.
+  - Out of order messages: If a message is retried, it may be sent after a later message, leading to out-of-order processing in the consumer.

@@ -29,5 +29,8 @@
 
 - Notes on backend fundamentals:
   - **API Design**: REST best practices, HTTP methods, pagination, sorting.
-  - **Caching Design**: Strategies, challenges, Redis architecture and use cases.
+  - **Caching Design**: Strategies (Read-Through, Write-Through, Write-Around, Write-Behind), challenges, Redis architecture and use cases.
   - **SQL Indexing**: Indexing strategies, performance optimization, and query tuning.
+  - **Data Modeling**: Database design principles and best practices.
+  - **Transactions**: ACID properties, isolation levels, and concurrency control.
+  - **Kafka**: Event streaming platform, producer-consumer patterns, topics, partitions, and consumer groups.

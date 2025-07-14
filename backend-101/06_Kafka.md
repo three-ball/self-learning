@@ -355,3 +355,124 @@ sequenceDiagram
 - **Issues**:
   - Duplicate messages: If a message is retried, it may be sent multiple times. This can lead to duplicate processing in the consumer.
   - Out of order messages: If a message is retried, it may be sent after a later message, leading to out-of-order processing in the consumer.
+
+### Batching
+
+> Kafka performance bottleneck is usually the network, not the disk. Batching is a way to improve throughput by sending multiple messages in a single request.
+
+- Batching is the process of grouping multiple messages together and sending them in a single request. This method improves throughput by reducing the number of requests sent over the network.
+- Batching is implemented in the producer.
+- Control by 2 parameters:
+  - `batch.size`: Maximum size of a batch in bytes. Default is 16KB.
+  - `linger.ms`: Maximum time to wait before sending a batch. Default is 0 (send immediately).
+
+#### `linger.ms`
+
+- Producer will wait for up to the specified time before sending a batch.
+- This add more latency, but allows more messages to be sent in a single request.
+- The default value is 0, which means the producer will send messages immediately without waiting.
+- If `linger.ms` = 0, batching still happens, but it is based on `batch.size` only. It may happen when the producer wait for the ACK from the broker.
+- if `linger.ms` is set to a positive value, the producer will wait for that amount of time before sending a batch, even if the batch size is not reached.
+
+#### `batch.size`
+
+- Maximum size of a batch in bytes.
+- Default is 16KB.
+- If the batch size is reached, the producer will send the batch immediately, regardless of the `linger.ms` setting.
+- A very large batch size can lead to increased memory usage and latency, as the producer will wait for more messages to fill the batch before sending.
+- If a message is larger than the batch size, the the message won't be batched and will be sent immediately.
+
+#### Trade-offs
+
+- Batching **improves throughput** by reducing the number of requests sent over the network but **adds latency.**
+- May improve i/o performance by reducing the number of disk writes.
+- Larger batch size can lead to increased memory usage and latency.
+
+### Compression
+
+- Compression is the process of reducing the size of messages before sending them over the network.
+- Compression has a positive impact on performance:
+  - Improve network throughput by reducing the amount of data sent over the network.
+  - Save storage space on the broker.
+  - Better latency due to reduced network traffic.
+- Cons: CPU overhead for compressing and decompressing messages.
+- Compression != Encryption. Compression is not a security feature, it is just a way to reduce the size of messages.
+- **Types**: `none`, `gzip`, `snappy`, `lz4`, `zstd`.
+- **Recommended**: `lz4` (normal case), `zstd` (high compression ratio).
+
+| Compression Type | Compression Ratio | CPU Overhead | Compression Speed | Network bandwidth |
+|------------------|-------------------|--------------|-------------------|-------------------|
+| `gzip`             | Highest               | Highest          | Slowest            | Slowest            |
+| `snappy`           | Medium                  | Medium              | Medium               | Medium               |
+| `lz4`              | Slowest               | Slowest           | Fastest             | Highest             |
+| `zstd`             | Medium                  | Medium              | Medium               | Medium               |
+
+- **Compression is configured in the producer** and **decompressing is done in the consumer**.
+- By default, brokers do not interfere with the batch when storing the batch.
+- The compression format on the producer side must match the decompression format on the consumer side.
+
+### Max In Flight Requests
+
+- `max.in.flight.requests.per.connection`: Maximum number of unacknowledged requests the producer can send to a broker before blocking.
+- Default is 5.
+- Purpose: improve throughput by allowing multiple requests in producer (not improving throughput in the broker).
+
+### Sticky Partitioner
+
+- `Sticky Partitioner` is the logic of the producer that determines which partition a message should be sent to.
+- Older versions of Kafka used round-robin partitioning, which mean producers don't immediately send messages but placing the partition-specific batches to sent later.
+- In case the parameter `linger.ms` is set to a positive value, the producer will wait for that amount of time before sending a batch. In the enviroment with low throughput, this can lead to a situation where the producer is waiting for messages to fill the batches of each partition.
+
+```mermaid
+sequenceDiagram
+    participant P as 📤 Producer
+    participant P0 as 📂 Partition 0
+    participant P1 as 📂 Partition 1
+    participant P2 as 📂 Partition 2
+    
+    Note over P,P2: Round-Robin (Old Behavior)
+    
+    P->>P0: Msg1 → Batch 0 (1/16KB)
+    P->>P1: Msg2 → Batch 1 (1/16KB)
+    P->>P2: Msg3 → Batch 2 (1/16KB)
+    P->>P0: Msg4 → Batch 0 (2/16KB)
+    
+    Note over P,P2: With linger.ms=10ms, producer waits<br/>for each partition batch to fill up
+    
+    P-->>P0: ⏰ Wait 10ms → Send partial batch
+    P-->>P1: ⏰ Wait 10ms → Send partial batch  
+    P-->>P2: ⏰ Wait 10ms → Send partial batch
+    
+    Note over P,P2: Result: 3 network requests<br/>with small, inefficient batches
+```
+
+- `Sticky Partitioner` improves the performance of the producer especially with high throughput. The producer sticky partitioner will:
+  - Send messages to the same partition until the batch is full or the linger time is reached.
+  - After that, it will switch to another partition.
+  - This approach reduces the number of requests and improves throughput.
+  - Sticky partitioner increases the rate of "filling" the batch, which leads to increase hit `batch.size` instead of `linger.ms`.
+
+```mermaid
+sequenceDiagram
+    participant P as 📤 Producer
+    participant P0 as 📂 Partition 0
+    participant P1 as 📂 Partition 1
+    participant P2 as 📂 Partition 2
+    
+    Note over P,P2: Sticky Partitioner (New Behavior)
+    
+    P->>P0: Msg1 → Batch 0 (1/16KB)
+    P->>P0: Msg2 → Batch 0 (2/16KB)
+    P->>P0: Msg3 → Batch 0 (3/16KB)
+    P->>P0: Msg4 → Batch 0 (16KB - FULL!)
+    
+    P-->>P0: ✅ Send full batch immediately
+    
+    Note over P,P2: Switch to next partition
+    
+    P->>P1: Msg5 → Batch 1 (1/16KB)
+    P->>P1: Msg6 → Batch 1 (2/16KB)
+    
+    Note over P,P2: Result: Fewer, larger batches<br/>Better network utilization
+```
+

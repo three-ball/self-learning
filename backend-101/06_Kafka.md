@@ -374,6 +374,8 @@ sequenceDiagram
 - If `linger.ms` = 0, batching still happens, but it is based on `batch.size` only. It may happen when the producer wait for the ACK from the broker.
 - if `linger.ms` is set to a positive value, the producer will wait for that amount of time before sending a batch, even if the batch size is not reached.
 
+> The more `linger.ms` is set, the more messages will be batched together, which leads to better throughput but higher latency.
+
 #### `batch.size`
 
 - Maximum size of a batch in bytes.
@@ -381,6 +383,8 @@ sequenceDiagram
 - If the batch size is reached, the producer will send the batch immediately, regardless of the `linger.ms` setting.
 - A very large batch size can lead to increased memory usage and latency, as the producer will wait for more messages to fill the batch before sending.
 - If a message is larger than the batch size, the the message won't be batched and will be sent immediately.
+
+> The more `batch.size` is set, the more messages will be batched together, which leads to better throughput but higher latency.
 
 #### Trade-offs
 
@@ -419,6 +423,8 @@ sequenceDiagram
 
 ### Sticky Partitioner
 
+> Awesome reference: [Kafka producer đã không còn Round Robin Partition với key null](https://thanhlv.com/blog/2024-08-07-Kafka-producer-da-khong-con-Round-Robin-Partition-voi-key-null.html)
+
 - `Sticky Partitioner` is the logic of the producer that determines which partition a message should be sent to.
 - Older versions of Kafka used round-robin partitioning, which mean producers don't immediately send messages but placing the partition-specific batches to sent later.
 - In case the parameter `linger.ms` is set to a positive value, the producer will wait for that amount of time before sending a batch. In the enviroment with low throughput, this can lead to a situation where the producer is waiting for messages to fill the batches of each partition.
@@ -451,6 +457,7 @@ sequenceDiagram
   - After that, it will switch to another partition.
   - This approach reduces the number of requests and improves throughput.
   - Sticky partitioner increases the rate of "filling" the batch, which leads to increase hit `batch.size` instead of `linger.ms`.
+- We can say this is "Per Batch" Round-Robin, where the producer sends messages to the same partition until the batch is full, then switches to the next partition.
 
 ```mermaid
 sequenceDiagram
@@ -476,3 +483,117 @@ sequenceDiagram
     Note over P,P2: Result: Fewer, larger batches<br/>Better network utilization
 ```
 
+### Idempotence
+
+> What if the producer sends the same message multiple times?
+
+- `Idempotence`: the operation can be applied multiple times without changing the result beyond the initial application.
+- How it works:
+  - A Unique producer ID (PID) is assigned to each producer.
+  - Each message sent by the producer includes a sequence number.
+  - The broker checks the sequence number and PID to determine if the message is sent before.
+- Configure:
+  - `enable.idempotence=true`.
+  - `acks=all`.
+  - `retries=INT_MAX` (or a large number).
+  - `max.in.flight.requests=5`
+- Note: Idempotent producers only resolve ordering issues on producer side.
+
+```mermaid
+sequenceDiagram
+    participant P as 📤 Producer (PID: 12345)
+    participant B as 🏢 Broker
+    participant L as 📝 Message Log
+    
+    Note over P,L: Idempotent Producer Flow
+    
+    %% First message attempt
+    P->>B: 1. Send Message A (PID: 12345, Seq: 0)
+    B->>B: 2. Check: PID 12345, Seq 0 - NEW
+    B->>L: 3. Store Message A (PID: 12345, Seq: 0)
+    B->>P: 4. ACK (offset: 100) ✅
+    
+    %% Second message
+    P->>B: 5. Send Message B (PID: 12345, Seq: 1)
+    B->>B: 6. Check: PID 12345, Seq 1 - NEW
+    B->>L: 7. Store Message B (PID: 12345, Seq: 1)
+    B->>P: 8. ACK (offset: 101) ✅
+    
+    %% Network failure scenario - retry
+    Note over P,B: Network timeout, producer retries Message B
+    
+    P->>B: 9. Retry Message B (PID: 12345, Seq: 1)
+    B->>B: 10. Check: PID 12345, Seq 1 - DUPLICATE!
+    Note right of B: Already processed this sequence
+    B->>P: 11. ACK (offset: 101) ✅
+    Note right of B: Returns same offset,<br/>no duplicate in log
+    
+    %% Next message continues normally
+    P->>B: 12. Send Message C (PID: 12345, Seq: 2)
+    B->>B: 13. Check: PID 12345, Seq 2 - NEW
+    B->>L: 14. Store Message C (PID: 12345, Seq: 2)
+    B->>P: 15. ACK (offset: 102) ✅
+```
+
+### Serialization
+
+> Serialization is the process of converting objects or data structures into bytes for transmission or storage.
+
+#### Formats
+
+- Text-based formats:
+  - `JSON`.
+  - `XML`.
+  - `String`.
+- Binary-based formats:
+  - `Avro`.
+  - `Protobuf`.
+  - `Thrift`.
+  
+#### Format Selection
+
+- **Complexity**: The difficulty of parsing and generating the format.
+  - Text-based formats are easier to read and debug.
+  - Binary formats are more efficient in terms of size and speed.
+  - Binary formats are more suitable for high-performance applications.
+- **Compatibility**: Is the format compatible with other components in the system?
+  - Text-based formats are more flexible and easier to evolve.
+  - Binary formats require careful schema management.
+- **Size**: The size of the serialized data.
+  - Binary formats are usually smaller than text-based formats.
+  - Smaller size leads to better network throughput and storage efficiency.
+
+## Consumer
+
+- A consumer is an application that subscribes to Kafka topics and processes messages.
+- Consumer can read from:
+  - The beginning of the topic.
+  - The specified offset or timestamp using `seek()`.
+  - The current position: a consumer goes down then restart or a new consumer joins the group and need to know the latest position.
+
+### Offset commit
+
+- Consumers need to keep track of the offsets of the messages they have processed.
+- Offset commit is the process of saving the current position of the consumer in a partition of the topic.
+- Where to store commits?
+  - Offsets are stored in a special topic called `__consumer_offsets`. This is the default and recommended way.
+  - Current offset = committed offset + 1.
+
+### Delivery Guarantees
+
+- Dekivery Guarantee: The assurance provided by the system about message delivery reliability and consistency.
+- 3 types of delivery guarantees:
+  - **At-Most-Once**: A message us processed at most once but it may be error.
+    - If a message is lost, it will not be retried.
+    - ***Usecase***: Logging, metrics, event IoT, etc.
+  - **At-Least-Once**: A message is processed at least once, but it may be duplicated.
+    - If a message is lost, it will be retried.
+    - ***Usecase***: Email, SMS, Data replication, etc.
+  - **Exactly-Once**: A message is processed exactly once, without duplicates or loss.
+    - This is the most complex and expensive guarantee to achieve.
+    - ***Usecase***: Financial transactions, where duplicates or loss are not acceptable.
+    - **Note**: A messaging platform cannot offer exactly-once delivery guarantee by itself. It requires the application to be designed to handle idempotent operations and deduplication logic.
+
+> Awesome reference: [You Cannot Have Exactly-Once Delivery](https://bravenewgeek.com/you-cannot-have-exactly-once-delivery/)
+> In the letter I mail you, I ask you to call me once you receive it. You never do. Either you really didn’t care for my letter or it got lost in the mail. That’s the cost of doing business. I can send the one letter and hope you get it, or I can send 10 letters and assume you’ll get at least one of them. The trade-off here is quite clear (postage is expensive!), but sending 10 letters doesn’t really provide any additional guarantees. In a distributed system, we try to guarantee the delivery of a message by waiting for an acknowledgement that it was received, but all sorts of things can go wrong. Did the message get dropped? Did the ack get dropped? Did the receiver crash? Are they just slow? Is the network slow? Am I slow? FLP and the Two Generals Problem are not design complexities, they are impossibility results.
+> To reiterate, there is no such thing as exactly-once delivery. We must choose between the lesser of two evils, which is at-least-once delivery in most cases. This can be used to simulate exactly-once semantics by ensuring idempotency or otherwise eliminating side effects from operations. Once again, it’s important to understand the trade-offs involved when designing distributed systems. There is asynchrony abound, which means you cannot expect synchronous, guaranteed behavior. Design for failure and resiliency against this asynchronous nature.

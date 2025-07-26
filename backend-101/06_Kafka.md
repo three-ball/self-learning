@@ -594,6 +594,46 @@ sequenceDiagram
     - ***Usecase***: Financial transactions, where duplicates or loss are not acceptable.
     - **Note**: A messaging platform cannot offer exactly-once delivery guarantee by itself. It requires the application to be designed to handle idempotent operations and deduplication logic.
 
-> Awesome reference: [You Cannot Have Exactly-Once Delivery](https://bravenewgeek.com/you-cannot-have-exactly-once-delivery/)
+> **Awesome reference**: [You Cannot Have Exactly-Once Delivery](https://bravenewgeek.com/you-cannot-have-exactly-once-delivery/)
 > In the letter I mail you, I ask you to call me once you receive it. You never do. Either you really didn’t care for my letter or it got lost in the mail. That’s the cost of doing business. I can send the one letter and hope you get it, or I can send 10 letters and assume you’ll get at least one of them. The trade-off here is quite clear (postage is expensive!), but sending 10 letters doesn’t really provide any additional guarantees. In a distributed system, we try to guarantee the delivery of a message by waiting for an acknowledgement that it was received, but all sorts of things can go wrong. Did the message get dropped? Did the ack get dropped? Did the receiver crash? Are they just slow? Is the network slow? Am I slow? FLP and the Two Generals Problem are not design complexities, they are impossibility results.
 > To reiterate, there is no such thing as exactly-once delivery. We must choose between the lesser of two evils, which is at-least-once delivery in most cases. This can be used to simulate exactly-once semantics by ensuring idempotency or otherwise eliminating side effects from operations. Once again, it’s important to understand the trade-offs involved when designing distributed systems. There is asynchrony abound, which means you cannot expect synchronous, guaranteed behavior. Design for failure and resiliency against this asynchronous nature.
+
+### Type of Commit
+
+#### Synchronous
+
+- **Pros**:
+  - Ordering: Messages are processed in the order they are received.
+  - Reduce the number of duplicate messages.
+- **Cons**:
+  - Manual offset management: The consumer must manually commit the offsets after processing the messages.
+  - May lead to low throughput if the processing is slow.
+  - Risk of sending heartbeat messages to the broker.
+
+#### Asynchronous
+
+- **Pros**:
+  - Higher throughput: Messages can be processed in parallel, leading to better performance.
+- **Cons**:
+  - Manual offset management.
+  - Error handling: If a message fails to process, it may be retried or skipped, leading to potential data loss or duplication.
+
+#### Automatic
+
+- **By default, consumers use automatic offset management** (every 5 seconds - ``auto.commit.interval.ms`).
+- Automatic commit is asynchronous, meaning the consumer does not wait for the broker to acknowledge the offset commit.
+- After processing a batch, consumers might process the next one without committing the offset of the previous batch.
+- **Pros**:
+  - Simplifies consumer logic.
+  - Higher throughput.
+- **Cons**:
+  - Risk of duplicated messages (more than sync and async case).
+
+#### Auto Offset Reset
+
+- Offset usually is stored in the `__consumer_offsets` topic.
+- **What if the current offset does not exist in the topic?** (Starting a new consumer group or the current offset is deleted).
+  - `auto.offset.reset` is the configuration that determines what to do in this case.
+  - `earliest`: Start consuming from the beginning of the topic.
+  - `latest`: Start consuming from the end of the topic (default).
+  - `none`: Throw an error if the offset does not exist.

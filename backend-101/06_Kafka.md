@@ -637,3 +637,152 @@ sequenceDiagram
   - `earliest`: Start consuming from the beginning of the topic.
   - `latest`: Start consuming from the end of the topic (default).
   - `none`: Throw an error if the offset does not exist.
+
+## Best Practices
+
+### Topic Naming
+
+> Awesome reference: [Kafka Topic Naming Conventions](https://www.confluent.io/learn/kafka-topic-naming-convention/#readability)
+
+- Using `-` or `.` instead of `_` in topic names to avoid conflict with Kafka's internal topics.
+- Convention (Recommended, not enforced):
+  - `<tenant_id>-<service_owner>-[private|public]-<topic_name>-<env>`.
+  - `<tenant_id>.<service_owner>.[private|public].<topic_name>.<env>`.
+
+### Choosing key
+
+- Why Key is Important?
+  - Ordering.
+  - Data Distribution.
+  - Deduplication.
+- Choosing the right key is crucial for ensuring that messages are processed in the correct order and distributed evenly across partitions.
+  - If ordering is important, use a key that ensures related messages go to the same partition.
+    - Based on business logic, such as user ID, order ID, etc.
+    - Make sure that data is distributed evenly across partitions to avoid hot spots.
+    - Be careful with compacted topics, as the key is used to determine which messages are retained.
+  - If you are not sure, just set key to `null`. Don't use a random key, as it will lead to uneven distribution of messages across partitions, **using `null` to make advantage of the round-robin or sticky partitioner**.
+
+### Message format
+
+- `Metadata`: Include metadata in the message to help with processing and debugging. We may put metadata in the `headers` or as part of the payload.
+  - `Timestamp`: When the message was produced.
+  - `Message ID`: Unique identifier for the message.
+  - `Original Message ID`: If the message is a retry, include the original message ID to help with deduplication or the upper layer/first service.
+  - `Service Name` or `Service ID`: The service that produced the message.
+- `Message code`: Use a consistent message code to identify the type of message.
+- `Payload`: Actual data of the message.
+
+```json
+{
+  "metadata": {
+    "timestamp": "2023-10-01T12:00:00Z",
+    "message_id": "random-unique-id-1",
+    "original_message_id": "random-unique-id-0",
+    "service_name": "order-service"
+  },
+  "code": "ORDER_CREATED",
+  "payload": {
+    "order_id": "ORD123456",
+    "user_id": "USR987654",
+    "items": [
+      {
+        "item_id": "ITEM123",
+        "quantity": 2
+      }
+    ],
+    "total_amount": 100.0
+  }
+}
+```
+
+### Recommended Configurations
+
+- Prioritize the characteristics:
+  - Throughput.
+  - Latency.
+  - Durability.
+  - Availability.
+
+**Example**:
+  - Financial System:
+    - (1) Durability.
+    - (2) Availability.
+    - (3) Latency.
+    - (4) Throughput.
+  - Data Ingestion System:
+    - (1) Throughput.
+    - (2) Availability.
+    - (3) Durability.
+    - (4) Latency.
+
+- We should check the version of Kafka because different versions have different default configurations.
+- Client libraries also affect the performance and behavior of Kafka. Make sure to use the latest version of the client library that is compatible with your Kafka cluster.
+- Engineering in real life is about trade-offs. We should choose the right configurations based on the use case and requirements.
+- Throughput (may differ by usecase, just for reference):
+  - Low: < 10K messages/sec.
+  - Moderate: 10K - 100K messages/sec.
+  - High: > 100K messages/sec.
+
+#### Producer Configurations
+
+> JUST FOR REFERENCE, ENGINEERING IS ABOUT TRADE-OFFS, CHOOSE THE RIGHT CONFIGURATIONS BASED ON YOUR USE CASE AND REQUIREMENTS.
+
+- Docs: [Kafka producer configuration reference | Confluent Documentation](https://docs.confluent.io/platform/current/installation/configuration/producer-configs.html)
+- Version: new (>= 2.8)
+- `acks`
+    - 1: throughput
+    - all: durability
+- `retries=30` (durability)
+- `enable.idempotence=true` (durability)
+- `linger.ms`:
+  - 0: low latency, low throughput
+  - 8: moderate latency, moderate throughput
+  - 20: high latency, high throughput
+- `compression.type`
+  - `None`: low throughput, low latency
+  - `lz4`: moderate throughput, balance between throughput and latency
+  - `Zstd`: very high throughput
+- `Batch.size`: (bytes)
+  - `16384`: moderate throughput
+  - `32768`: high throughput
+- `Buffer.memory`
+- `max.in.flight.requests.per.connection=5`
+- `Partitioner`: null (default). Good for throughput, latency, and even distribution.
+
+#### Consumer Configurations
+
+> JUST FOR REFERENCE, ENGINEERING IS ABOUT TRADE-OFFS, CHOOSE THE RIGHT CONFIGURATIONS BASED ON YOUR USE CASE AND REQUIREMENTS.
+
+- Docs: [Kafka Consumer configuration reference | Confluent Documentation](https://docs.confluent.io/platform/current/installation/configuration/consumer-configs.html)
+- Version: new (>= 2.8)
+- `group.id=` (required for consumer groups)
+- `enable.auto.commit=true` (simplicity vs manual control)
+- `auto.offset.reset=latest` (start from newest messages)
+- `receive.buffer.bytes`:
+  - `4MB`: if memory is no problem
+  - `1MB`: if memory is scarce
+- `partition.assignment.strategy=org.apache.kafka.clients.consumer.CooperativeStickyAssignor` (balanced assignment)
+- `fetch.min.bytes`:
+  - `1` (default): low latency
+  - `50000`: high throughput
+- `session.timeout.ms`:
+  - `45000`: default
+  - Low number: better availability (faster failure detection)
+
+#### Topic Configurations
+
+> JUST FOR REFERENCE, ENGINEERING IS ABOUT TRADE-OFFS, CHOOSE THE RIGHT CONFIGURATIONS BASED ON YOUR USE CASE AND REQUIREMENTS.
+
+- Docs: [Kafka topic configuration reference | Confluent Documentation](https://docs.confluent.io/platform/current/installation/configuration/topic-configs.html)
+- `partitions`:
+  - `1`: preserving message ordering
+  - Higher number of partitions → higher throughput
+  - **Tradeoffs**: [How to Choose the Number of Topics/Partitions in a Kafka Cluster?](https://www.confluent.io/blog/how-choose-number-topics-partitions-kafka-cluster/) | Confluent
+- `replication.factor=3` (fault tolerance)
+- `min.insync.replicas=2` (durability vs availability balance)
+- `compression.type=producer` (inherit from producer settings)
+
+#### Additional Resources
+
+- [Kafka in Production](https://github.com/dttung2905/kafka-in-production)
+- [Kafka option explorer](https://learn.conduktor.io/kafka/kafka-options-explorer/)

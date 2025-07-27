@@ -66,6 +66,90 @@ graph TD
   - Operational overhead.
   - Cost.
 
+### Why Kafka?
+
+- We choosing Message broker based on these criteria:
+  - Delivery guarantee
+  - Functionality
+  - Performance
+  - Scalability
+  - Ecosystem
+
+#### Database-backed queues
+
+> Some references: 
+> [Message Queue Using MySQL](https://www.pirobits.com/post/message-queue-using-mysql-select-for-update)
+
+- **Pros**:
+  - Delivery guarantee: we may achieve At-least-once delivery guarantee.
+  - Leverage existing database infrastructure.
+
+- **Cons**:
+  - Performance: Not designed for high throughput. Database locks can lead to contention and slow performance.
+  - Scalability: Limited by database capacity. Scaling requires sharding or partitioning.
+  - Complexity: Managing message states (e.g., processing, failed) can be complex.
+  - Functionality: Limited features compared to dedicated message brokers (e.g., no built-in support for pub/sub, fan-out, etc.).
+
+#### Redis
+
+- Redis can work as message brokers with 3 features:
+  - **Pub/Sub**: Publish/subscribe messaging pattern. (at-most-once delivery).
+  - **Lists**: Using lists as queues with `LPUSH` and `RPOP` (at-most-once delivery).
+  - **Streams**: A more advanced feature for handling streams of data with built-in support for consumer groups and message offsets. (at-least-once delivery).
+
+- **Pros**:
+  - Leveraging existing Redis infrastructure.
+  - High performance and low latency.
+  - Simple to set up and use.
+- **Cons**:
+  - Durability: Data is stored in memory, so it may be lost on restart or failure.
+  - Resource limitations: Memory-based storage can lead to scalability issues.
+  - Poor features for a message broker.
+
+#### RabbitMQ
+
+> Some references: [RabbitMQ vs. Kafka](https://blog.bytebytego.com/i/136167161/rabbitmq-vs-kafka)
+
+- **Pros**:
+  - Flexible routing and message patterns.
+  - Support at-least-once delivery guarantee.
+  - Delay, Priority, RPC, etc.
+  - Low latency.
+  - Wide language support.
+- **Cons**:
+  - Deleting messages on acknowledgment can lead to message loss if not handled properly. You need to set automatic acknowledgment or manual acknowledgment to ensure messages are not lost.
+  - Medium throughput compared to Kafka.
+  - Ecosystem is not as rich as Kafka.
+
+#### NATS
+
+> Some references: [Compare NATS](https://docs.nats.io/nats-concepts/overview/compare-nats)
+
+- NATs has the concept "[Queue Groups](https://docs.nats.io/nats-concepts/core-nats/queue)" alternative to consumer groups in Kafka. But in Kafka, there are three methods of load balacing (hash, round-robin, and sticky partitioner), while NATS only supports round-robin.
+
+- **Pros**:
+  - High performance than Kafka.
+  - Flexible Routing.
+  - Less operational overhead.
+- **Cons**:
+  - Ordering: NATS does not guarantee message ordering across multiple subscribers.
+
+#### Kafka
+
+> Some references: [Why is Kafka fast?](https://blog.bytebytego.com/p/why-is-kafka-fast)
+
+- **Actually Kafka is not so fast**. It's optimized for high throughput and long-term retention at expense of latency, while preserving message order, durability, and scalability.
+- Kafka performance is based on a lot of design decisions:
+  - **Broker side**:
+    - Kafka utilizes a segmented, append-only log structure for storing messages, which allows for efficient disk I/O and high throughput. **Kafka uses sequential for both reading and writing messages**, which is much faster than random access.
+    - **Zero-copy technology**: Kafka uses a zero-copy mechanism to transfer data from disk to network, which reduces CPU usage and improves throughput.Zero-copy is disabled if we configure compression and SSL.
+    - **Unflushed Buffered Writes**: Kafka does not flush data to disk immediately after writing. Instead, it buffers writes in memory and flushes them periodically. This reduces the number of disk I/O operations and improves throughput. Kafka just write to buffer and return ACK to producer, then flush to disk later. Is this may lead to data loss? Using in-sync replicas (ISRs) and replication factor, Kafka ensures that data is not lost even if the leader broker fails before flushing to disk.
+  - **Client side**
+    - Kafka bottleneck is usually the network, not the disk. Kafka producer uses batching to send multiple messages in a single request, which improves throughput by reducing the number of requests sent over the network.
+  - Streaming Parallelism:
+    - Partitioning allows Kafka to scale horizontally by distributing data across multiple brokers and partitions. Each partition can be processed independently, allowing for parallel processing of messages.
+
+
 ### The difference between `Event` vs `Request/Response`
 
 - **Event**: Just a thing that happened. It may a bussiness fact that value to more than one service. Event does not require a response.
@@ -651,6 +735,10 @@ sequenceDiagram
   - **Database**: Store the error event in a database, such as MySQL, PostgreSQL, etc. This allows for better observability and tracking of errors but we need to handle the database logic and handle archiving the error events.
   - **Store in another topic**: Store the error event in a separate topic, such as `error-events`. This allows for better observability and tracking of errors, and we can use a separate consumer to process the error events. This is the recommended way to handle errors in Kafka. But we will another problem: What if the error event fail again?
     - **Multi-level retry**: We can use a multi-level retry mechanism to handle errors in Kafka. The idea is to have multiple topics for different levels of retries, such as `error-events`, `error-events-retry-1`, `error-events-retry-2`, etc. Each topic will have its own consumer that will process the error events and retry them. The final topic that we can't retry will be `Dead Letter Queue (DLQ)`, where we store the error events that cannot be retried anymore.
+    - **Cons**: 
+      - Complexity: Multi-level retry adds complexity to the system, as we need to manage multiple topics and consumers.
+      - Monitoring: We need to monitor the error events and retry them manually if needed.
+      - Backpressure: If the error events are not processed quickly, it may lead to backpressure on the system.
 - Retry logic must be backoff to avoid overwhelming the system with retries. We can use exponential backoff or a fixed delay between retries.
 
 > "No mechanism brought more distributed systems down than retry logic."

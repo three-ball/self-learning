@@ -906,6 +906,38 @@ Flexibility: The group leader can implement custom partition assignment logic ba
 - **Eager rebalance is a process where the group leader immediately reassigns partitions to consumers when a new consumer joins or an existing consumer leaves**. This ensures that all consumers have a balanced load and can start consuming messages as soon as possible but may lead to temporary unavailability of some partitions.
 - **Cooperative rebalance  has the same process as eager rebalance, but the consumer doesn't immediately stop consume message.  Consumers take the difference with their current assignment, then revoke any partitions that don’t appear in their new assignment**. Likewise, they will add any partitions that appear in their new assignment but not in their current assignment. This allows consumers to continue processing messages while the rebalance is happening,For every partition that appears in both their old and new assignments, they don’t have to do a thing. Very few rebalances require a significant migration of partitions between consumers, so in most cases, there will be little or absolutely nothing to do.
 
+## Liveness
+
+- Kafka satisfies the liveness in 2 ways:
+  - **Check availability**:
+    - Is it alive still?
+    - Requiring consumers to periodically exchange heartbeats with the group coordinator.
+    - By default, consumers send a heartbeat every 3 seconds (`heartbeat.interval.ms`).
+    - In consumer coordinator, the `session.timeout.ms` is the maximum time a consumer can be inactive before it is considered dead. If a consumer does not send a heartbeat within this time, it will be removed from the group and a rebalance will be triggered.
+  - **Check progress**:
+    - Is it making progress?
+    - Requiring consumers to invoke the `poll()` method periodically.
+    - `poll()` method is used to fetch `max.poll.records` messages from the topic and process them. Max time between 2 `poll()` calls is `max.poll.interval.ms`. If the time between 2 `poll()` calls exceeds this value, the consumer will be considered dead and the group coordinator will trigger a rebalance.
+
+## Some problems
+
+### Topic Width
+
+- Kafka only allows increasing the number of partitions in a topic, not decreasing.
+- Increasing partitions can lead to one key being distributed across multiple partitions, which can break ordering guarantees.
+- **Number of partitions = Expected throughput / Throughput per partition.**
+- Write throughput per partition is usually around 10MB/s.
+- Read throughput per partition is usually based on the application and the consumer's processing speed.
+
+### Large Messages
+
+- The default maximum message size in Kafka is 1MB (`message.max.bytes`).
+- What if we need to send larger messages?
+  - Re-configure `message.max.bytes` on the broker: Limitation (max is 10MB), slow down consuming, wasting resources.
+  - External storage: Store large messages in an external storage system (e.g., S3, HDFS) and send a reference (URL) in the Kafka message.
+    - Pros: No size limitation, better performance.
+    - Cons: Requires additional logic to handle external storage, may lead to data consistency issues if not handled properly.
+
 ## Best Practices
 
 ### Topic Naming

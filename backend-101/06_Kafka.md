@@ -638,6 +638,23 @@ sequenceDiagram
   - `latest`: Start consuming from the end of the topic (default).
   - `none`: Throw an error if the offset does not exist.
 
+## Error Handling
+
+- We can split Error into 2 types:
+  - **Retriable  errors**: Errors that can be retried, such as network errors, broker unavailability, etc.
+  - **Non-retriable  errors**: Errors that cannot be retried, such as invalid messages, schema validation errors, error relate to the business logic, etc.
+- Simple retry may lead to some issues:
+  - **Consumer blocking**: Simple retry may block the consumer and lead to a backlog of messages.
+  - **Observability**: Simple retry may make it difficult to track the progress of the consumer and identify issues.
+- Retry non-blocking: Where does we store the error event?
+  - **On memory**: Not recommended, as it may lead to data loss if the consumer crashes.
+  - **Database**: Store the error event in a database, such as MySQL, PostgreSQL, etc. This allows for better observability and tracking of errors but we need to handle the database logic and handle archiving the error events.
+  - **Store in another topic**: Store the error event in a separate topic, such as `error-events`. This allows for better observability and tracking of errors, and we can use a separate consumer to process the error events. This is the recommended way to handle errors in Kafka. But we will another problem: What if the error event fail again?
+    - **Multi-level retry**: We can use a multi-level retry mechanism to handle errors in Kafka. The idea is to have multiple topics for different levels of retries, such as `error-events`, `error-events-retry-1`, `error-events-retry-2`, etc. Each topic will have its own consumer that will process the error events and retry them. The final topic that we can't retry will be `Dead Letter Queue (DLQ)`, where we store the error events that cannot be retried anymore.
+- Retry logic must be backoff to avoid overwhelming the system with retries. We can use exponential backoff or a fixed delay between retries.
+
+> "No mechanism brought more distributed systems down than retry logic."
+
 ## Best Practices
 
 ### Topic Naming

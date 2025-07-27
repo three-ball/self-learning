@@ -743,6 +743,169 @@ sequenceDiagram
 
 > "No mechanism brought more distributed systems down than retry logic."
 
+## Group membership and Partition Assignment
+
+### Group membership
+
+**Consumer Group Coordinator** (Broker-side):
+- **Location**: Runs on a Kafka broker
+- **Selection**: Determined by hashing the group ID
+- **Responsibilities**:
+  - Manages group membership (joins/leaves)
+  - Detects consumer failures via heartbeats
+  - Triggers rebalance when membership changes
+  - Assigns one consumer as the group leader
+  - Distributes the final partition assignment to all consumers
+  - Persists group metadata and committed offsets
+
+**Group Leader** (Client-side):
+
+- **Location**: One of the consumer instances in the group
+- **Selection**: Usually the first consumer to join the group
+- **Responsibilities**:
+  - Collects subscription information from all group members
+  - Runs the partition assignment algorithm (Range, RoundRobin, Sticky, etc.)
+  - Calculates which consumer gets which partitions
+  - Sends the assignment proposal back to the coordinator
+
+```mermaid
+sequenceDiagram
+    participant C1 as 📥 Consumer 1<br/>(Group Leader)
+    participant C2 as 📥 Consumer 2
+    participant GC as 🏢 Group Coordinator<br/>(Broker)
+    participant T as 📋 Topic Partitions
+    
+    Note over C1,T: Rebalance Triggered (New Consumer Joins)
+    
+    GC->>C1: 1. Assign as Group Leader
+    GC->>C1: 2. Send group metadata
+    GC->>C2: 3. Request subscription info
+    
+    C2->>GC: 4. Subscription details
+    GC->>C1: 5. Forward all subscriptions
+    
+    C1->>C1: 6. Run assignment algorithm<br/>(Sticky/RoundRobin/Range)
+    C1->>GC: 7. Send assignment plan
+    
+    GC->>C1: 8. Your partitions: [0, 1]
+    GC->>C2: 9. Your partitions: [2, 3]
+    
+    Note over C1,T: Assignment complete,<br/>consumers start processing
+```
+
+### Group protocol
+
+- **Membership phrase**:
+  - Assume that 3 consumers join the same group simultaneously.
+  - The group coordinator will assign one of them as the group leader.
+  - The group coordinator responses to the group leader with the group metadata.
+
+```mermaid
+sequenceDiagram
+    participant C1 as 📥 Consumer 1
+    participant C2 as 📥 Consumer 2
+    participant C3 as 📥 Consumer 3
+    participant GC as 🏢 Group Coordinator<br/>(Broker)
+    
+    Note over C1,GC: Membership Phase - 3 Consumers Join Simultaneously
+    
+    par Consumers Join
+        C1->>GC: 1a. JoinGroup Request
+        Note right of C1: group.id: "payment-service"
+    and
+        C2->>GC: 1b. JoinGroup Request
+        Note right of C2: group.id: "payment-service"
+    and
+        C3->>GC: 1c. JoinGroup Request
+        Note right of C3: group.id: "payment-service"
+    end
+    
+    GC->>GC: 2. Select Group Leader
+    Note right of GC: Usually first consumer to join<br/>Consumer 1 becomes leader
+    
+    GC->>C1: 3. JoinGroup Response (LEADER[C1], MEMBER[C2, C3])
+    Note right of GC: Includes all member metadata
+    
+    GC->>C2: 4. JoinGroup Response (LEADER[C1], MEMBER[])
+    Note right of GC: Wait for assignment
+    
+    GC->>C3: 5. JoinGroup Response (LEADER[C1], MEMBER[])
+    Note right of GC: Wait for assignment
+    
+    Note over C1,GC: Group Leader (C1) has all metadata<br/>Ready for assignment calculation
+```
+
+- **Sync phase**:
+  - The group leader collects subscription information from all consumers in the group.
+  - The group leader is responsible for determining the partition assignment for each consumer in the group.
+  - The group leader sends partition assignment to the group coordinator.
+  - The group coordinator sends the partition assignment to each consumer in the group.
+
+// ...existing code...
+- **Sync phase**:
+  - The group leader collects subscription information from all consumers in the group.
+  - The group leader is responsible for determining the partition assignment for each consumer in the group.
+  - The group leader sends partition assignment to the group coordinator.
+  - The group coordinator sends the partition assignment to each consumer in the group.
+
+```mermaid
+sequenceDiagram
+    participant C1 as 📥 Consumer 1<br/>(Group Leader)
+    participant C2 as 📥 Consumer 2
+    participant C3 as 📥 Consumer 3
+    participant GC as 🏢 Group Coordinator<br/>(Broker)
+    participant T as 📋 Topics<br/>(order-events)
+    
+    Note over C1,T: Sync Phase - Partition Assignment Calculation
+    
+    %% Leader collects subscription info
+    Note over C1,GC: Group Leader has all member metadata from Join phase
+    
+    C1->>C1: 1. Collect subscriptions from all members
+    Note right of C1: Members: [C1, C2, C3]<br/>Subscriptions: ["order-events"]
+    
+    C1->>C1: 2. Run partition assignment algorithm
+    Note right of C1: Algorithm: CooperativeStickyAssignor<br/>Topic: order-events (3 partitions)<br/>Consumers: 3
+    
+    C1->>C1: 3. Calculate assignment
+    Note right of C1: C1 → Partition 0<br/>C2 → Partition 1<br/>C3 → Partition 2
+    
+    %% Send assignment to coordinator
+    C1->>GC: 4. SyncGroup Request (Assignment Plan)
+    Note right of C1: Assignment: {<br/>  C1: [order-events-0],<br/>  C2: [order-events-1],<br/>  C3: [order-events-2]<br/>}
+    
+    %% Other consumers send empty sync requests
+    par Other Consumers Wait
+        C2->>GC: 5a. SyncGroup Request (Empty)
+        Note right of C2: Waiting for assignment
+    and
+        C3->>GC: 5b. SyncGroup Request (Empty)
+        Note right of C3: Waiting for assignment
+    end
+    
+    %% Coordinator distributes assignments
+    GC->>C1: 6. SyncGroup Response
+    Note right of GC: Your assignment:<br/>[order-events-0]
+    
+    GC->>C2: 7. SyncGroup Response
+    Note right of GC: Your assignment:<br/>[order-events-1]
+    
+    GC->>C3: 8. SyncGroup Response
+    Note right of GC: Your assignment:<br/>[order-events-2]
+    
+    Note over C1,T: All consumers now know their partitions<br/>Ready to start consuming messages
+```
+
+**Why partition assignment is determined by the group leader?**
+Flexibility: The group leader can implement custom partition assignment logic based on the application needs.
+
+### Eager Rebalance vs Cooperative Rebalance
+
+> Awesome reference: [The incremental cooperative rebalancing protocol](https://www.confluent.io/blog/cooperative-rebalancing-in-kafka-streams-consumer-ksqldb/#incremental-cooperative-rebalancing-protocol)
+
+- **Eager rebalance is a process where the group leader immediately reassigns partitions to consumers when a new consumer joins or an existing consumer leaves**. This ensures that all consumers have a balanced load and can start consuming messages as soon as possible but may lead to temporary unavailability of some partitions.
+- **Cooperative rebalance  has the same process as eager rebalance, but the consumer doesn't immediately stop consume message.  Consumers take the difference with their current assignment, then revoke any partitions that don’t appear in their new assignment**. Likewise, they will add any partitions that appear in their new assignment but not in their current assignment. This allows consumers to continue processing messages while the rebalance is happening,For every partition that appears in both their old and new assignments, they don’t have to do a thing. Very few rebalances require a significant migration of partitions between consumers, so in most cases, there will be little or absolutely nothing to do.
+
 ## Best Practices
 
 ### Topic Naming

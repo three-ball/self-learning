@@ -935,8 +935,62 @@ Flexibility: The group leader can implement custom partition assignment logic ba
 - What if we need to send larger messages?
   - Re-configure `message.max.bytes` on the broker: Limitation (max is 10MB), slow down consuming, wasting resources.
   - External storage: Store large messages in an external storage system (e.g., S3, HDFS) and send a reference (URL) in the Kafka message.
-    - Pros: No size limitation, better performance.
-    - Cons: Requires additional logic to handle external storage, may lead to data consistency issues if not handled properly.
+    - **Pros**: No size limitation, better performance.
+    - **Cons**: Requires additional logic to handle external storage, may lead to data consistency issues if not handled properly.
+
+### Request - Response Pattern
+
+- Problem: Sometimes, the requester also needs to wait for a response from the responder.
+- Solution: Use a separate topic for responses. But which request does the response belong to?
+  - Use a correlation ID: Include a unique identifier in the request message and the response message. The requester can then match the response to the request based on this ID.
+  - Response can store in local cache, database, remote cache for polling, or implement callback mechanism. Each approach has its own trade-offs.
+
+### Dual Write
+
+- Context: When a service needs to write to both Kafka and another data store (e.g., database) or both Kafka and another Kafka topic. Requirements:
+  - Consistency: Both writes must succeed or fail together.
+  - Atomicity: The writes should be treated as a single unit of work.
+
+#### United Dual-Write
+
+- **United Dual-Write**: 2 writes in two different topics, but they are treated as a single unit of work.
+- Solution: Kafka transactions.
+  - Kafka transactions allow you to write to multiple topics atomically.
+  - Use the `beginTransaction()`, `send()`, and `commitTransaction()` methods in the producer to ensure that both writes are committed together.
+  - If any write fails, you can use `abortTransaction()` to roll back both writes.
+
+#### Separate Dual-Write
+
+- **Separate Dual-Write**: 2 writes in database and Kafka, but they are treated as separate units of work.
+- Potential solutions:
+  - **CDC**: Change Data Capture (CDC) is a technique that captures changes in the database and publishes them to Kafka.
+    - Simple
+    - Not full control over the data flow.
+  - **Saga Pattern**: A distributed transaction pattern that ensures consistency across multiple services.
+    - Each service has its own local transaction.
+    - If a service fails, it can trigger compensating actions to roll back the changes made by previous services.
+    - More complex, but provides better control over the data flow and error handling.
+  - **Transactional Outbox Pattern**: A pattern that ensures that messages are sent to Kafka only after the database transaction is committed.
+    - The service writes the message to an outbox table in the database as part of the same transaction.
+    - A separate process reads from the outbox table and sends messages to Kafka (this may be `Debezium` + `Kafka connect`).
+    - Ensures that messages are sent only after the database transaction is committed, providing better consistency.
+    - Trades off:
+      - Simplicity: Easier to implement than the Saga pattern.
+      - Performance: May introduce some latency due to the separate process reading from the outbox table.
+      - Complexity: Requires additional logic to handle and maintain the outbox table and the separate process.
+      - At least once delivery: The outbox table may contain duplicate messages if the process reading from the outbox table fails and retries.
+
+### Ordering Guarantees
+
+- The importance of ordering guarantees depends on the use case.
+  - Gaming: Ordering is crucial, as the game state must be consistent across all players.
+  - Order Processing: Ordering is important, as the order of events affects the final state of the order.
+- Order by field(s) or compare logic: created_at(timestamp), sequence number, etc.
+- Be careful with physical clock to order events, as it may lead to issues with clock skew and time synchronization.
+- Kafka provides ordering guarantees within a partition, but not across partitions.
+- To ensure end-to-end ordering:
+  - `enable.idempotence=true` in the producer.
+  - Group related messages by key to ensure they go to the same partition.
 
 ## Best Practices
 

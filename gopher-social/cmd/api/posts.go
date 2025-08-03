@@ -46,7 +46,7 @@ func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request
 	// Placeholder for post creation logic
 	// This will handle the creation of a new post
 	// For now, we can just return a success message
-	if err := writeJSON(w, http.StatusCreated, map[string]string{
+	if err := app.jsonResponse(w, http.StatusCreated, map[string]string{
 		"message": "Post created successfully",
 		"post_id": strconv.FormatInt(newPost.ID, 10),
 	}); err != nil {
@@ -88,7 +88,7 @@ func (app *application) getPostHandler(w http.ResponseWriter, r *http.Request) {
 
 	post.Comments = comments
 
-	if err := writeJSON(w, http.StatusOK, post); err != nil {
+	if err := app.jsonResponse(w, http.StatusOK, post); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }
@@ -99,7 +99,7 @@ type UpdatePostPayload struct {
 	Tags    []string `json:"tags"`
 }
 
-func (app *application) updatePostHandler(w http.ResponseWriter, r *http.Request) {
+func (app *application) patchPostHandler(w http.ResponseWriter, r *http.Request) {
 	postID := chi.URLParam(r, "postID")
 	if postID == "" {
 		app.badRequestError(w, r, errors.New("post ID is required"))
@@ -133,12 +133,19 @@ func (app *application) updatePostHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
+	// Validate only the fields that are provided
 	if err := Validate.Struct(payload); err != nil {
 		app.badRequestError(w, r, err)
 		return
 	}
 
-	// Update only the provided fields
+	// Check if at least one field is provided for update
+	if payload.Title == nil && payload.Content == nil && payload.Tags == nil {
+		app.badRequestError(w, r, errors.New("at least one field must be provided for update"))
+		return
+	}
+
+	// Update only the provided fields (PATCH semantics)
 	if payload.Title != nil {
 		existingPost.Title = *payload.Title
 	}
@@ -155,7 +162,7 @@ func (app *application) updatePostHandler(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	if err := writeJSON(w, http.StatusOK, existingPost); err != nil {
+	if err := app.jsonResponse(w, http.StatusOK, existingPost); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }
@@ -186,7 +193,7 @@ func (app *application) deletePostHandler(w http.ResponseWriter, r *http.Request
 		}
 	}
 
-	if err := writeJSON(w, http.StatusOK, map[string]string{
+	if err := app.jsonResponse(w, http.StatusOK, map[string]string{
 		"message": "Post deleted successfully",
 	}); err != nil {
 		app.internalServerError(w, r, err)

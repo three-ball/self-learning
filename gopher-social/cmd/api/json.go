@@ -38,3 +38,11 @@ func readJSON(w http.ResponseWriter, r *http.Request, data any) error {
 
 	return decoder.Decode(data)
 }
+
+func (app *application) jsonResponse(w http.ResponseWriter, status int, data any) error {
+	type envelope struct {
+		Data any `json:"data"`
+	}
+
+	return writeJSON(w, status, envelope{Data: data})
+}

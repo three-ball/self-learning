@@ -147,7 +147,7 @@ func (s *PostsStore) Delete(ctx context.Context, id int64) error {
 	return nil
 }
 
-func (s *PostsStore) GetUserFeed(ctx context.Context, userID int64) ([]PostWithMetadata, error) {
+func (s *PostsStore) GetUserFeed(ctx context.Context, userID int64, pgq *PaginatedQuery) ([]PostWithMetadata, error) {
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 	// still can't get this part? Why the instructor use JOIN which OR condition?
@@ -189,16 +189,30 @@ func (s *PostsStore) GetUserFeed(ctx context.Context, userID int64) ([]PostWithM
 		left join users u on
 			p.user_id = u.id
 		left join followers f on
-			p.user_id = f.user_id
+			p.user_id = f.user_id -- For each post in the posts table, the database looks for matching followers
 		where
-			f.follower_id = $1 -- Fetch posts the user is following
-			or p.user_id = $1 -- or fetch posts by the user themselves
+			(
+				f.follower_id = $1 -- Fetch posts the user is following
+				or 
+				p.user_id = $1 -- or fetch posts by the user themselves
+			)
+			and 
+			(
+				p.title ilike '%' || $4 || '%' 
+				or
+				p.content ilike '%' || $4 || '%'
+			)
+			and
+			(
+				p.tags @> $5 or $5 = '{}'
+			)
 		group by
 			(p.id, u.id)
 		order by
-			p.created_at desc;`
+			p.created_at ` + pgq.Sort + `
+		limit $2 offset $3;`
 
-	rows, err := s.db.QueryContext(ctx, query, userID)
+	rows, err := s.db.QueryContext(ctx, query, userID, pgq.Limit, pgq.Offset, pgq.Search, pq.Array(pgq.Tags))
 	if err != nil {
 		return nil, err
 	}
@@ -207,7 +221,7 @@ func (s *PostsStore) GetUserFeed(ctx context.Context, userID int64) ([]PostWithM
 	for rows.Next() {
 		var post PostWithMetadata
 		var username string
-		var tags pq.StringArray
+		var tags []string
 		if err := rows.Scan(
 			&post.ID,
 			&post.UserID,
@@ -216,7 +230,7 @@ func (s *PostsStore) GetUserFeed(ctx context.Context, userID int64) ([]PostWithM
 			&post.Content,
 			&post.CreatedAt,
 			&post.Version,
-			pq.Array(&post.Tags),
+			pq.Array(&tags),
 			&post.CommentsCount,
 		); err != nil {
 			return nil, err

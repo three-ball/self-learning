@@ -9,10 +9,22 @@ import (
 
 func (a *application) getUserFeedHandler(w http.ResponseWriter, r *http.Request) {
 	// pagination, filtering, and sorting logic can be added here
+	pg := store.NewPaginatedQuery()
+
+	pg, err := pg.Parse(r)
+	if err != nil {
+		a.badRequestError(w, r, err)
+		return
+	}
+
+	if err := Validate.Struct(pg); err != nil {
+		a.badRequestError(w, r, err)
+		return
+	}
 
 	ctx := r.Context()
 
-	feed, err := a.store.Posts.GetUserFeed(ctx, getUserFromCtx(r).ID)
+	feed, err := a.store.Posts.GetUserFeed(ctx, getUserFromCtx(r).ID, pg)
 	if err != nil {
 		switch {
 		case errors.Is(err, store.ErrNotFound):

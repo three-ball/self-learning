@@ -3,6 +3,7 @@ package store
 import (
 	"context"
 	"database/sql"
+	"time"
 )
 
 /*
@@ -29,6 +30,8 @@ type CommentStore struct {
 }
 
 func (s *CommentStore) GetByPostID(ctx context.Context, postID int64) ([]*Comment, error) {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	query := `
 		SELECT id, post_id, user_id, content, created_at
 		FROM comments WHERE post_id = $1
@@ -57,6 +60,8 @@ func (s *CommentStore) GetByPostID(ctx context.Context, postID int64) ([]*Commen
 }
 
 func (s *CommentStore) Create(ctx context.Context, comment *Comment) error {
+	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
+	defer cancel()
 	query := `
 		INSERT INTO comments (post_id, user_id, content)
 		VALUES ($1, $2, $3) RETURNING id, created_at

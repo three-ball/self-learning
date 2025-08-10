@@ -41,9 +41,14 @@ func (a *application) mount() *chi.Mux {
 		// Posts routes
 		r.Route("/posts", func(r chi.Router) {
 			r.Post("/", a.createPostHandler)
-			r.Get("/{postID}", a.getPostHandler)
-			r.Patch("/{postID}", a.patchPostHandler)
-			r.Delete("/{postID}", a.deletePostHandler)
+			r.Route("/{postID}", func(r chi.Router) {
+				// middleware to load post data into context
+				r.Use(a.postsContextMiddleware)
+
+				r.Get("/", a.getPostHandler)
+				r.Patch("/", a.patchPostHandler)
+				r.Delete("/", a.deletePostHandler)
+			})
 		})
 
 		// Comments routes
@@ -53,7 +58,19 @@ func (a *application) mount() *chi.Mux {
 
 		// User routes
 		r.Route("/users", func(r chi.Router) {
-			r.Post("/", a.createUserHandler) // Assuming createUserHandler is defined
+			r.Post("/", a.createUserHandler)
+			r.Route("/{userID}", func(r chi.Router) {
+				// middleware to load user data into context
+				r.Use(a.usersContextMiddleware)
+
+				r.Get("/", a.getUserHandler)
+				r.Patch("/", a.patchUserHandler)
+				r.Delete("/", a.deleteUserHandler)
+				r.Put("/follow", a.followUserHandler)     // Using PUT instead of POST for idempotency: Following/unfollowing a user multiple times should have the same result
+				r.Put("/unfollow", a.unfollowUserHandler) // Using PUT instead of POST for idempotency: Following/unfollowing a user multiple times should have the same result
+				r.Get("/feed", a.getUserFeedHandler)      // just put feed here for simplicity, we will add auth later
+			})
+
 		})
 	})
 

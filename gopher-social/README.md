@@ -9,4 +9,6 @@
 
 ### Useful Links
 
-. [12 Factor App](https://12factor.net/)
+- [12 Factor App](https://12factor.net/)
+- [Index Columns for `LIKE` in PostgreSQL](https://niallburkley.com/blog/index-columns-for-like-in-postgres/)
+- [pg_trgm](https://www.postgresql.org/docs/9.5/pgtrgm.html)

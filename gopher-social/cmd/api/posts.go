@@ -1,6 +1,7 @@
 package main
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -8,6 +9,48 @@ import (
 	"github.com/go-chi/chi/v5"
 	"github.com/three-ball/gopher-social/internal/store"
 )
+
+type postContextKey string
+
+const (
+	pck postContextKey = "post"
+)
+
+func getPostFromCtx(r *http.Request) *store.Post {
+	post, _ := r.Context().Value(pck).(*store.Post)
+	return post
+}
+
+func (app *application) postsContextMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		postID := chi.URLParam(r, "postID")
+		if postID == "" {
+			app.badRequestError(w, r, errors.New("post ID is required"))
+			return
+		}
+
+		id, err := strconv.ParseInt(postID, 10, 64)
+		if err != nil {
+			app.badRequestError(w, r, err)
+			return
+		}
+
+		post, err := app.store.Posts.GetByID(r.Context(), id)
+		if err != nil {
+			switch {
+			case errors.Is(err, store.ErrNotFound):
+				app.notFoundError(w, r, err)
+				return
+			default:
+				app.internalServerError(w, r, err)
+				return
+			}
+		}
+
+		ctx := context.WithValue(r.Context(), pck, post)
+		next.ServeHTTP(w, r.WithContext(ctx))
+	})
+}
 
 type CreatePostPayload struct {
 	Title   string   `json:"title" validate:"required,max=100"`
@@ -55,32 +98,9 @@ func (app *application) createPostHandler(w http.ResponseWriter, r *http.Request
 }
 
 func (app *application) getPostHandler(w http.ResponseWriter, r *http.Request) {
-	postID := chi.URLParam(r, "postID")
-	if postID == "" {
-		app.badRequestError(w, r, errors.New("post ID is required"))
-		return
-	}
+	post := getPostFromCtx(r)
 
-	// Convert postID to int64
-	id, err := strconv.ParseInt(postID, 10, 64)
-	if err != nil {
-		app.badRequestError(w, r, err)
-		return
-	}
-
-	post, err := app.store.Posts.GetByID(r.Context(), id)
-	if err != nil {
-		switch {
-		case errors.Is(err, store.ErrNotFound):
-			app.notFoundError(w, r, err)
-			return
-		default:
-			app.internalServerError(w, r, err)
-			return
-		}
-	}
-
-	comments, err := app.store.Comments.GetByPostID(r.Context(), id)
+	comments, err := app.store.Comments.GetByPostID(r.Context(), post.ID)
 	if err != nil {
 		app.internalServerError(w, r, err)
 		return
@@ -100,31 +120,7 @@ type UpdatePostPayload struct {
 }
 
 func (app *application) patchPostHandler(w http.ResponseWriter, r *http.Request) {
-	postID := chi.URLParam(r, "postID")
-	if postID == "" {
-		app.badRequestError(w, r, errors.New("post ID is required"))
-		return
-	}
-
-	// Convert postID to int64
-	id, err := strconv.ParseInt(postID, 10, 64)
-	if err != nil {
-		app.badRequestError(w, r, err)
-		return
-	}
-
-	// Get the existing post
-	existingPost, err := app.store.Posts.GetByID(r.Context(), id)
-	if err != nil {
-		switch {
-		case errors.Is(err, store.ErrNotFound):
-			app.notFoundError(w, r, err)
-			return
-		default:
-			app.internalServerError(w, r, err)
-			return
-		}
-	}
+	existingPost := getPostFromCtx(r)
 
 	// Read the update payload
 	var payload UpdatePostPayload

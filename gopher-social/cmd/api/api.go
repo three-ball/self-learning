@@ -104,8 +104,9 @@ func (a *application) mount() *chi.Mux {
 				r.Use(a.postsContextMiddleware)
 
 				r.Get("/", a.getPostHandler)
-				r.Patch("/", a.patchPostHandler)
-				r.Delete("/", a.deletePostHandler)
+				r.Patch("/", a.checkPostOwnership("moderator", a.patchPostHandler)) // only if the user is the owner of the post or has moderator role
+				r.Delete("/", a.checkPostOwnership("admin", a.deletePostHandler))   // only if the user is the owner of the post or has admin role
+
 			})
 		})
 

@@ -21,10 +21,6 @@ type User struct {
 	RoleID    int64    `json:"role_id"`
 	Role      Role     `json:"role"`
 }
-type Role struct {
-	ID   int64  `json:"id"`
-	Name string `json:"name"`
-}
 
 type password struct {
 	text *string
@@ -85,26 +81,36 @@ func (s *UsersStore) Create(ctx context.Context, tx *sql.Tx, user *User) error {
 	return nil
 }
 
-func (s *UsersStore) GetByID(ctx context.Context, id int64) (*User, error) {
+func (s *UsersStore) GetByID(ctx context.Context, userID int64) (*User, error) {
+	query := `
+		SELECT users.id, username, email, password, created_at, roles.*
+		FROM users
+		JOIN roles ON (users.role_id = roles.id)
+		WHERE users.id = $1 AND is_active = true
+	`
+
 	ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
 	defer cancel()
 
-	query := `
-		SELECT id, username, email, created_at
-		FROM users WHERE id = $1
-	`
-
 	user := &User{}
-	err := s.db.QueryRowContext(ctx, query, id).Scan(
+	err := s.db.QueryRowContext(
+		ctx,
+		query,
+		userID,
+	).Scan(
 		&user.ID,
 		&user.Username,
 		&user.Email,
+		&user.Password.hash,
 		&user.CreatedAt,
+		&user.Role.ID,
+		&user.Role.Name,
+		&user.Role.Level,
+		&user.Role.Description,
 	)
-
 	if err != nil {
-		switch {
-		case errors.Is(err, sql.ErrNoRows):
+		switch err {
+		case sql.ErrNoRows:
 			return nil, ErrNotFound
 		default:
 			return nil, err

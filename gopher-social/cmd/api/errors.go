@@ -59,3 +59,9 @@ func (app *application) unauthorizedError(
 		"you are not authorized to access this resource",
 	)
 }
+
+func (app *application) forbiddenError(w http.ResponseWriter, r *http.Request) {
+	app.logger.Warnw("forbidden", "method", r.Method, "path", r.URL.Path, "error")
+
+	writeJSONError(w, http.StatusForbidden, "forbidden")
+}

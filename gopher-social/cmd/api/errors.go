@@ -1,7 +1,6 @@
 package main
 
 import (
-	"log"
 	"net/http"
 )
 
@@ -10,7 +9,7 @@ func (app *application) internalServerError(
 	r *http.Request,
 	err error,
 ) {
-	log.Printf("internal server error: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
+	app.logger.Errorf("internal server error: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
 
 	writeJSONError(
 		w,
@@ -24,7 +23,7 @@ func (app *application) badRequestError(
 	r *http.Request,
 	err error,
 ) {
-	log.Printf("bad request: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
+	app.logger.Errorf("bad request: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
 
 	writeJSONError(
 		w,
@@ -38,11 +37,25 @@ func (app *application) notFoundError(
 	r *http.Request,
 	err error,
 ) {
-	log.Printf("not found: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
+	app.logger.Errorf("not found: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
 
 	writeJSONError(
 		w,
 		http.StatusNotFound,
 		"the requested resource could not be found",
+	)
+}
+
+func (app *application) unauthorizedError(
+	w http.ResponseWriter,
+	r *http.Request,
+	err error,
+) {
+	app.logger.Errorf("unauthorized: %s path: %s error: %s", r.Method, r.URL.Path, err.Error())
+
+	writeJSONError(
+		w,
+		http.StatusUnauthorized,
+		"you are not authorized to access this resource",
 	)
 }

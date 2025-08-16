@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"time"
 )
 
 var (
@@ -11,6 +12,10 @@ var (
 	ErrNotFound = errors.New("resource not found")
 	// ErrEntityExists is returned when trying to create an entity that already exists.
 	ErrEntityExists = errors.New("entity already exists")
+	// ErrDuplicateEmail is returned when the email already exists.
+	ErrDuplicateEmail = errors.New("a user with that email already exists")
+	// ErrDuplicateUsername is returned when the username already exists.
+	ErrDuplicateUsername = errors.New("a user with that username already exists")
 )
 
 type Storage struct {
@@ -23,10 +28,13 @@ type Storage struct {
 	}
 
 	Users interface {
-		Create(ctx context.Context, user *User) error
 		GetByID(ctx context.Context, id int64) (*User, error)
+		GetByEmail(context.Context, string) (*User, error)
+		Create(context.Context, *sql.Tx, *User) error
 		Update(ctx context.Context, user *User) error
 		Delete(ctx context.Context, id int64) error
+		Activate(context.Context, string) error
+		CreateAndInvite(ctx context.Context, user *User, token string, invitationExp time.Duration) error
 	}
 
 	Comments interface {
@@ -47,4 +55,18 @@ func NewStorage(db *sql.DB) Storage {
 		Comments: &CommentStore{db: db},
 		Follow:   &FollowStore{db: db},
 	}
+}
+
+func withTx(db *sql.DB, ctx context.Context, fn func(*sql.Tx) error) error {
+	tx, err := db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+
+	if err := fn(tx); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+
+	return tx.Commit()
 }

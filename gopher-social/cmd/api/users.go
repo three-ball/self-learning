@@ -10,6 +10,11 @@ import (
 	"github.com/three-ball/gopher-social/internal/store"
 )
 
+var (
+	ErrDuplicateEmail    = errors.New("a user with that email already exists")
+	ErrDuplicateUsername = errors.New("a user with that username already exists")
+)
+
 type userContextKey string
 
 const (
@@ -49,44 +54,20 @@ func (app *application) usersContextMiddleware(next http.Handler) http.Handler {
 	})
 }
 
-func (app *application) createUserHandler(w http.ResponseWriter, r *http.Request) {
-	var user struct {
-		Email    string `json:"email"`
-		Username string `json:"username"`
-		Password string `json:"password"`
-	}
-	if err := readJSON(w, r, &user); err != nil {
-		app.badRequestError(w, r, err)
-		return
-	}
-	if user.Email == "" || user.Username == "" || user.Password == "" {
-		app.badRequestError(w, r, errors.New("email, username, and password are required"))
-		return
-	}
-	newUser := &store.User{
-		Email:    user.Email,
-		Username: user.Username,
-		Password: user.Password, // In a real application, you should hash the password before storing it
-	}
-	if err := app.store.Users.Create(r.Context(), newUser); err != nil {
-		switch {
-		case errors.Is(err, store.ErrEntityExists):
-			app.badRequestError(w, r, err)
-			return
-		default:
-			app.internalServerError(w, r, err)
-			return
-		}
-	}
-	if err := writeJSON(w, http.StatusCreated, map[string]string{
-		"message": "User created successfully",
-		"user_id": strconv.FormatInt(newUser.ID, 10),
-	}); err != nil {
-		app.internalServerError(w, r, err)
-		return
-	}
-}
-
+// GetUser godoc
+//
+//	@Summary		Fetches a user profile
+//	@Description	Fetches a user profile by ID
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			id	path		int	true	"User ID"
+//	@Success		200	{object}	store.User
+//	@Failure		400	{object}	error
+//	@Failure		404	{object}	error
+//	@Failure		500	{object}	error
+//	@Security		ApiKeyAuth
+//	@Router			/users/{id} [get]
 func (app *application) getUserHandler(w http.ResponseWriter, r *http.Request) {
 	// Revert back to authentication middleware to get user from context
 	user := getUserFromCtx(r)
@@ -179,6 +160,19 @@ type FollowUser struct {
 	UserID int64 `json:"user_id"`
 }
 
+// FollowUser godoc
+//
+//	@Summary		Follows a user
+//	@Description	Follows a user by ID
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			userID	path		int		true	"User ID"
+//	@Success		204		{string}	string	"User followed"
+//	@Failure		400		{object}	error	"User payload missing"
+//	@Failure		404		{object}	error	"User not found"
+//	@Security		ApiKeyAuth
+//	@Router			/users/{userID}/follow [put]
 func (app *application) followUserHandler(w http.ResponseWriter, r *http.Request) {
 	followerUser := getUserFromCtx(r)
 	var follow FollowUser
@@ -213,6 +207,19 @@ func (app *application) followUserHandler(w http.ResponseWriter, r *http.Request
 	}
 }
 
+// UnfollowUser gdoc
+//
+//	@Summary		Unfollow a user
+//	@Description	Unfollow a user by ID
+//	@Tags			users
+//	@Accept			json
+//	@Produce		json
+//	@Param			userID	path		int		true	"User ID"
+//	@Success		204		{string}	string	"User unfollowed"
+//	@Failure		400		{object}	error	"User payload missing"
+//	@Failure		404		{object}	error	"User not found"
+//	@Security		ApiKeyAuth
+//	@Router			/users/{userID}/unfollow [put]
 func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Request) {
 	followerUser := getUserFromCtx(r)
 	unfollowUserID := chi.URLParam(r, "userID")
@@ -242,6 +249,37 @@ func (app *application) unfollowUserHandler(w http.ResponseWriter, r *http.Reque
 	if err := writeJSON(w, http.StatusOK, map[string]string{
 		"message": "User unfollowed successfully",
 	}); err != nil {
+		app.internalServerError(w, r, err)
+	}
+}
+
+// ActivateUser godoc
+//
+//	@Summary		Activates/Register a user
+//	@Description	Activates/Register a user by invitation token
+//	@Tags			users
+//	@Produce		json
+//	@Param			token	path		string	true	"Invitation token"
+//	@Success		204		{string}	string	"User activated"
+//	@Failure		404		{object}	error
+//	@Failure		500		{object}	error
+//	@Security		ApiKeyAuth
+//	@Router			/users/activate/{token} [put]
+func (app *application) activateUserHandler(w http.ResponseWriter, r *http.Request) {
+	token := chi.URLParam(r, "token")
+
+	err := app.store.Users.Activate(r.Context(), token)
+	if err != nil {
+		switch err {
+		case store.ErrNotFound:
+			app.notFoundError(w, r, err)
+		default:
+			app.internalServerError(w, r, err)
+		}
+		return
+	}
+
+	if err := app.jsonResponse(w, http.StatusNoContent, ""); err != nil {
 		app.internalServerError(w, r, err)
 	}
 }

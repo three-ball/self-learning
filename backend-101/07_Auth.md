@@ -157,15 +157,88 @@ sequenceDiagram
     - Server-side tracking of token revocation in a blocklist.
     - Refresh token patterns where a stateful refresh token is used to get new stateless access tokens.
 
+**TODO**: Add usecase of hybrid approach.
+**TODO**: Add JWT best practices.
+**TODO**: Add JWT security considerations.
+
 ## Authorization
+
 ### Definition
+
+**Authorization** is the process of determining what actions a user is allowed to perform after they've been authenticated. It answers the question: "What are you allowed to do?"
+Authorization determines the permissions and access rights of an authenticated user to specific resources or operations.
+
 ### Types of Authorization
 
-## Implementation in Go
-### Basic Authentication
-### JWT (JSON Web Tokens)
-### OAuth 2.0
-### Role-Based Access Control (RBAC)
+#### Role-Based Access Control (RBAC)
+
+- RBAC grants access based on the roles assigned to users. Permissions are assigned to roles, and users are assigned to one or more roles.
+- **How it works**:
+    1. Define roles (e.g., Admin, User, Guest).
+    2. Assign permissions to roles (e.g., Admin can create/delete users, User can view content).
+    3. Assign roles to users.
+    4. When a user attempts an action, the system checks if the user's role has the required permission.
+
+#### Attribute-Based Access Control (ABAC)
+
+- **ABAC** makes access decisions based on attributes associated with users, resources, actions, and environment/context.
+- **How it works**:
+    - User is authenticated and their attributes are retrieved
+    - User attempts to access a resource or perform an action
+    - System evaluates policy rules based on:
+        - User attributes (role, department, clearance)
+        - Resource attributes (type, owner, sensitivity)
+        - Action attributes (read, write, delete)
+        - Environmental attributes (time, location, device)
+    - Access is granted or denied based on policy evaluation
+
+#### Policy-Based Access Control (PBAC)
+
+- **Policy-Based Access Control** uses centralized policies to determine access rights. Policies are written in a policy language and evaluated by a policy engine.
+
+Example of a policy language: [Open Policy Agent (OPA)](https://www.openpolicyagent.org/docs)
+
+```rego
+package envoy.authz
+
+import input.attributes.request.http as http_request
+
+default allow := false
+
+allow if {
+	is_token_valid
+	action_allowed
+}
+
+is_token_valid if {
+	token.valid
+	now := time.now_ns() / 1000000000
+	token.payload.nbf <= now
+	now < token.payload.exp
+}
+
+# Allowed actions based on user role
+action_allowed if {
+	http_request.method == "GET"
+	token.payload.role == "guest"
+}
+
+
+action_allowed if {
+	http_request.method == "GET"
+	token.payload.role == "admin"
+}
+
+action_allowed if {
+	http_request.method == "POST"
+	token.payload.role == "admin"
+}
+
+token := {"valid": valid, "payload": payload} if {
+	[_, encoded] := split(http_request.headers.authorization, " ")
+	[valid, _, payload] := io.jwt.decode_verify(encoded, {"secret": "secret"})
+}
+```
 
 ## Usecase & Best Practices
 

@@ -35,14 +35,16 @@ func allocateNConsecutiveBlockIndex(memory []int, n int) int {
 	}
 
 	totalFree := 0
-	for index, _ := range memory {
-		totalFree++
-		if totalFree == n {
-			// index  = [0, 1, 2, 3, 4, 5]
-			// memory = [0, 1, 1, 0, 0, 0]
-			// n = 2
-			// index = 4 match the condition, return index = 3 -> 4 - n + 1
-			return index - n + 1
+	for index, value := range memory {
+		if value == 0 {
+			totalFree++
+			if totalFree == n {
+				// index  = [0, 1, 2, 3, 4, 5]
+				// memory = [0, 1, 1, 0, 0, 0]
+				// n = 2
+				// index = 4 match the condition, return index = 3 -> 4 - n + 1
+				return index - n + 1
+			}
 		} else {
 			totalFree = 0
 		}

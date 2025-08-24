@@ -34,3 +34,10 @@
   - **Data Modeling**: Database design principles and best practices.
   - **Transactions**: ACID properties, isolation levels, and concurrency control.
   - **Kafka**: Event streaming platform, producer-consumer patterns, topics, partitions, and consumer groups.
+
+## [6. DSA](/dsa)
+
+- Data Structures and Algorithms concepts and implementations.
+- Reference materials and resources:
+  - [Data Structures](https://www.youtube.com/watch?v=zgCnMvvw6Oo&list=PLpPXw4zFa0uKKhaSz87IowJnOTzh9tiBk)
+  - [Road map](https://neetcode.io/roadmap)

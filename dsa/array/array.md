@@ -1,5 +1,7 @@
 # ARRAY
 
+![Array](../images/array.png)
+
 ## Definition
 
 An **Array** is a collection of elements stored in contiguous memory locations, where each element can be accessed using an index. Arrays are homogeneous data structures, meaning all elements are of the same data type.

@@ -5,36 +5,22 @@
 
 # Some basics
 
-## What the heck is time complexity and space complexity?
+## What the heck is complexity?
 
 > Sometime I hear people say "O(n) time complexity" or "O(1) space complexity". What the heck is that?
 
 - Big O Notation is a mathematical way to describe how an algorithm's performance scales as the input size grows. Think of it as predicting how your system will behave under load.
-- Time Complexity: How fast does it run? Measured in terms of the number of operations it performs relative to the input size.
+- When talking about complexity, we usually refer to two main aspects:
+  - **Space Complexity**: How much memory does it use? Measured in terms of the amount of memory it needs relative to the input size.
+  - **Time Complexity**: How fast does it run? Measured in terms of the number of operations it performs relative to the input size.
+- Something important to note:
+  - Input >= 0;
+  - Function do more work for more input;
+  - Drop constants and lower order terms;
+    - e.g., O(2n) -> O(n), O(n + log n) -> O(n);
+    - n^3 + n^2 + n + 1 -> O(n^3);
 
-```mermaid
-graph LR
-    A["Input Size n"] --> B["O(1) - Constant"]
-    A --> C["O(log n) - Logarithmic"]
-    A --> D["O(n) - Linear"]
-    A --> E["O(n log n) - Log-Linear"]
-    A --> F["O(n²) - Quadratic"]
-    A --> G["O(2ⁿ) - Exponential"]
-    
-    B --> B1["Same time regardless of input size"]
-    C --> C1["Halves the problem size each step"]
-    D --> D1["Doubles when input size doubles"]
-    E --> E1["Slightly worse than linear"]
-    F --> F1["4x slower when input doubles"]
-    G --> G1["AVOID AT ALL COSTS!"]
-    
-    style B1 fill:#4caf50
-    style C1 fill:#8bc34a
-    style D1 fill:#ffc107
-    style E1 fill:#ff9800
-    style F1 fill:#f44336
-    style G1 fill:#9c27b0
-```
+![Big O Notation Chart](images/big_O_notation.png)
 
 - `O(1)` - Constant Time: The algorithm takes the same amount of time regardless of input size. Example: Accessing an element in an array by index.
 

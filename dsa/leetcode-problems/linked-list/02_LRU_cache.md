@@ -1,3 +1,12 @@
+# 146. LRU Cache
+
+## Statement
+
+> Design a data structure that follows the constraints of a Least Recently Used (LRU) cache.
+
+- Least Recently Used (LRU) cache: Discards least recently used items first.
+
+```go
 package main
 
 type Node struct {
@@ -89,3 +98,4 @@ func (this *LRUCache) Put(key int, value int) {
 
 	return
 }
+```

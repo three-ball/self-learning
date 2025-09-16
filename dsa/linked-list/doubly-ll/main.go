@@ -7,241 +7,178 @@ import (
 
 var (
 	ErrLinkedListEmpty        = errors.New("linked list is empty")
-	ErrLinkedListNodeNotFound = errors.New("errors node not found")
+	ErrLinkedListNodeNotFound = errors.New("node not found")
 )
 
-// nodeData represents the data stored in each node
-type nodeData struct {
-	id   string // unique identifier for the node
-	data int    // actual data value stored in the node
-}
-
-// newNodeData creates a new nodeData instance
-func newNodeData(id string, data int) *nodeData {
-	return &nodeData{
-		id:   id,
-		data: data,
-	}
-}
-
-// Node represents a single node in the linked list
-// Contains data and a pointer to the next node
 type Node struct {
-	data     *nodeData
-	Next     *Node
-	Previous *Node
+	Key   string // Assume key is string and unique, for example: uuid, email, etc.
+	Value int
+	Next  *Node
+	Prev  *Node
 }
 
-// newNode creates a new Node instance
-func newNode(n *nodeData, next *Node, previous *Node) *Node {
-	return &Node{
-		data:     n,
-		Next:     next,
-		Previous: previous,
+type DLL struct {
+	nodeDict map[string]*Node
+	head     *Node
+	tail     *Node
+}
+
+// NewDLL create the new doubly linked list
+// with "sentinel" pattern: a dummy head and a dummy tail
+func NewDLL() *DLL {
+	head := &Node{}
+	tail := &Node{}
+
+	head.Next = tail
+	tail.Prev = head
+
+	return &DLL{
+		nodeDict: make(map[string]*Node),
+		head:     head,
+		tail:     tail,
 	}
 }
 
-type DoublyLinkedList struct {
-	head *Node
-	tail *Node
-	size int
-}
-
-func NewDoublyLinkedList() *DoublyLinkedList {
-	return &DoublyLinkedList{
-		head: nil,
-		tail: nil,
-		size: 0,
-	}
-}
-
-// Size returns the current number of nodes in the linked list
+// Size returns the number of nodes in the list
 // Time Complexity: O(1)
-func (d *DoublyLinkedList) Size() int {
-	return d.size
+func (dll *DLL) Size() int {
+	return len(dll.nodeDict)
 }
 
-// IsEmpty checks if the linked list is empty
+// IsEmpty checks if the list is empty
 // Time Complexity: O(1)
-func (d *DoublyLinkedList) IsEmpty() bool {
-	return d.head == nil
+func (dll *DLL) IsEmpty() bool {
+	return dll.Size() == 0
 }
 
-// GetHead returns the head node (for external access if needed)
+// Append adds a new node at the end (before tail sentinel)
 // Time Complexity: O(1)
-func (d *DoublyLinkedList) GetHead() *Node {
-	return d.head
-}
-
-// GetTail returns the tail node
-func (d *DoublyLinkedList) GetTail() *Node {
-	return d.tail
-}
-
-// Clear removes all nodes from the doubly linked list
-// Time Complexity: O(1) - Go's garbage collector handles cleanup
-func (d *DoublyLinkedList) Clear() {
-	d.head = nil
-	d.tail = nil
-	d.size = 0
-}
-
-// InsertHead inserts a new node at the beginning of the doubly linked list
-// The new node becomes the new head
-// Time Complexity: O(1)
-func (d *DoublyLinkedList) InsertHead(id string, data int) {
-	nodeData := newNodeData(id, data)
-	newNode := newNode(nodeData, d.head, nil)
-
-	if !d.IsEmpty() {
-		d.head.Previous = newNode
-	} else {
-		// first node is also the tail
-		d.tail = newNode
+func (dll *DLL) Append(key string, value int) {
+	newNode := &Node{
+		Key:   key,
+		Value: value,
 	}
 
-	d.head = newNode
-	d.size++
+	newNode.Prev = dll.tail.Prev
+	newNode.Next = dll.tail
+
+	dll.tail.Prev.Next = newNode
+	dll.tail.Prev = newNode
+
+	dll.nodeDict[key] = newNode
 }
 
-// InsertTail inserts a new node at the end of the doubly linked list
-// The new node becomes the new tail
+// Prepend adds a new node at the beginning (after head sentinel)
 // Time Complexity: O(1)
-func (d *DoublyLinkedList) InsertTail(id string, data int) {
-	nodeData := newNodeData(id, data)
-	newNode := newNode(nodeData, nil, d.tail)
-
-	if d.tail != nil {
-		d.tail.Next = newNode
-	} else {
-		// First node is also the head
-		d.head = newNode
+func (dll *DLL) InsertHead(key string, value int) {
+	newNode := &Node{
+		Key:   key,
+		Value: value,
 	}
 
-	d.tail = newNode
-	d.size++
+	newNode.Prev = dll.head
+	newNode.Next = dll.head.Next
+
+	dll.head.Next.Prev = newNode
+	dll.head.Next = newNode
+
+	dll.nodeDict[key] = newNode
 }
 
-// Delete removes the first node with the specified id from the doubly linked list
-// Returns an error if the list is empty or node is not found
-// Time Complexity: O(n) - may need to traverse entire list
-func (d *DoublyLinkedList) Delete(id string) error {
-	if d.IsEmpty() {
+// Remove deletes a node with the given key
+// Time Complexity: O(1)
+func (dll *DLL) Remove(key string) error {
+	if dll.IsEmpty() {
 		return ErrLinkedListEmpty
 	}
-	current := d.head
-	for current != nil {
-		if current.data.id == id {
-			if current.Previous == nil {
-				// head node
-				d.head = current.Next
-				d.head.Previous = nil
-			} else {
-				current.Previous.Next = current.Next
-			}
 
-			if current.Next == nil {
-				// tail node
-				d.tail = current.Previous
-				d.tail.Next = nil
-			} else {
-				current.Next.Previous = current.Previous
-			}
-
-			d.size--
-			return nil
-		}
-		current = current.Next
+	if node, ok := dll.nodeDict[key]; ok {
+		node.Next.Prev = node.Prev
+		node.Prev.Next = node.Next
+		return nil
 	}
+
 	return ErrLinkedListNodeNotFound
 }
 
-func (d *DoublyLinkedList) Search(id string) (int, error) {
-	if d.IsEmpty() {
+// Search finds a node with the given key and returns its value
+// Time Complexity: O(1)
+func (dll *DLL) Search(key string) (int, error) {
+	if dll.IsEmpty() {
 		return 0, ErrLinkedListEmpty
 	}
 
-	current := d.head
-	for current != nil {
-		if current.data.id == id {
-			return current.data.data, nil
-		}
-
-		current = current.Next
+	if node, ok := dll.nodeDict[key]; ok {
+		return node.Value, nil
 	}
 
 	return 0, ErrLinkedListNodeNotFound
 }
 
-// Display prints the doubly linked list in forward direction
-// Used for debugging and visualization
+// Update modifies the value of an existing key
+// Time Complexity: O(1)
+func (dll *DLL) Update(key string, value int) error {
+	if node, ok := dll.nodeDict[key]; ok {
+		node.Value = value
+		return nil
+	}
+	return ErrLinkedListNodeNotFound
+}
+
+// Display prints the list from head to tail
 // Time Complexity: O(n)
-func (d *DoublyLinkedList) Display() {
-	if d.IsEmpty() {
+func (dll *DLL) Display() {
+	if dll.IsEmpty() {
 		fmt.Println("List is empty")
 		return
 	}
 
-	current := d.head
-	fmt.Print("nil <- ")
-	for current != nil {
-		fmt.Printf("[%s:%d]", current.data.id, current.data.data)
-		if current.Next != nil {
-			fmt.Print(" <-> ")
-		}
+	current := dll.head.Next
+	fmt.Print("HEAD <-> ")
+	for current != dll.tail {
+		fmt.Printf("[%s:%d] <-> ", current.Key, current.Value)
 		current = current.Next
 	}
-	fmt.Println(" -> nil")
+	fmt.Println("TAIL")
 }
 
-// DisplayReverse prints the doubly linked list in reverse direction
-// Used for debugging and visualization of backward traversal
-// Time Complexity: O(n)
-func (d *DoublyLinkedList) DisplayReverse() {
-	if d.IsEmpty() {
-		fmt.Println("List is empty")
-		return
-	}
-
-	current := d.tail
-	fmt.Print("nil <- ")
-	for current != nil {
-		fmt.Printf("[%s:%d]", current.data.id, current.data.data)
-		if current.Previous != nil {
-			fmt.Print(" <-> ")
-		}
-		current = current.Previous
-	}
-	fmt.Println(" -> nil")
+// Clear removes all nodes from the list
+// Time Complexity: O(1)
+func (dll *DLL) Clear() {
+	dll.head.Next = dll.tail
+	dll.tail.Prev = dll.head
+	dll.nodeDict = make(map[string]*Node)
 }
 
-// Example usage and testing
+// Example usage
 func main() {
-	dll := NewDoublyLinkedList()
+	dll := NewDLL()
 
-	fmt.Println("=== Doubly Linked List Demo ===")
+	fmt.Println("=== Doubly Linked List with HashMap Demo ===")
 
-	// Insert elements
-	dll.InsertHead("2", 20)
-	dll.InsertHead("1", 10)
-	dll.InsertTail("3", 30)
-	dll.InsertTail("4", 40)
+	// Test operations
+	dll.Append("first", 10)
+	dll.Append("second", 20)
+	dll.InsertHead("zero", 0)
+	dll.Append("third", 30)
 
 	fmt.Println("Forward display:")
 	dll.Display()
 
-	fmt.Println("Reverse display:")
-	dll.DisplayReverse()
-
-	fmt.Printf("Size: %d\n", dll.Size())
-
-	// Search
-	if val, err := dll.Search("3"); err == nil {
-		fmt.Printf("Found node '3': %d\n", val)
+	// Search operations
+	if val, err := dll.Search("second"); err == nil {
+		fmt.Printf("Found 'second': %d\n", val)
 	}
 
-	// Delete
-	dll.Delete("2")
-	fmt.Println("After deleting '2':")
+	// Update
+	dll.Update("second", 25)
+	fmt.Println("After updating 'second' to 25:")
 	dll.Display()
+
+	// Remove
+	dll.Remove("zero")
+	fmt.Println("After removing 'zero':")
+	dll.Display()
+
+	fmt.Printf("Size: %d\n", dll.Size())
 }

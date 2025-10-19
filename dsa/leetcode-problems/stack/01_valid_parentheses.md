@@ -1,9 +1,23 @@
-package main
+# 20. Valid Parentheses
 
-import (
-	"fmt"
-)
+## Statement
 
+Given a string s containing just the characters '(', ')', '{', '}', '[' and ']', determine if the input string is valid.
+
+An input string is valid if:
+
+1. Open brackets must be closed by the same type of brackets.
+2. Open brackets must be closed in the correct order.
+3. Every close bracket has a corresponding open bracket of the same type.
+ 
+## Solution in Go
+
+- The opening brackets are pushed onto a stack.
+- When a closing bracket is encountered, the top element is popped from the stack and checked for a match.
+- If there is a mismatch or if the stack is empty when a closing bracket is encountered, the string is invalid.
+- Finally, if the stack is empty after processing the entire string, the string is valid.
+
+```go
 const OPENBRACKET = -1
 const CLOSEBRACKET = 1
 
@@ -77,36 +91,4 @@ func isValid(s string) bool {
 
 	return len(openStack.items) == 0
 }
-
-func main() {
-	testCases := []struct {
-		input    string
-		expected bool
-	}{
-		{"()", true},
-		{"()[]{}", true},
-		{"(]", false},
-		{"([])", true},
-		{"([)]", false},
-	}
-
-	fmt.Println("=== Valid Parentheses Test ===")
-
-	for i, tc := range testCases {
-		result := isValid(tc.input)
-		status := "✓"
-		if result != tc.expected {
-			status = "✗"
-		}
-
-		fmt.Printf("Test %d: %s \"%s\" -> %v (expected: %v) %s\n",
-			i+1, status, tc.input, result, tc.expected, status)
-	}
-
-	// Test the current implementation
-	fmt.Println("\n=== Current Implementation Results ===")
-	for _, tc := range testCases {
-		result := isValid(tc.input)
-		fmt.Printf("Input: \"%s\" -> %v\n", tc.input, result)
-	}
-}
+```

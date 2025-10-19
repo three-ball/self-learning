@@ -164,3 +164,34 @@ xychart-beta
     y-axis "Operations" 0 --> 100000000
     line [1, 10000, 1000000, 25000000, 100000000]
 ```
+
+## Some common patterns
+
+### Sentinel Pattern
+
+- `Wiki`:
+    - **Sentinel value**: In computer programming, a sentinel value (also referred to as **a flag value**, **trip value**, or **dummy data**) is a special value in the context of an algorithm which uses its presence as a condition of termination, typically in a loop or recursive algorithm.
+    - **Sentinel node**: In computer programming, a sentinel node is a specifically designated node used with linked lists and trees as a traversal path terminator. This type of node does not hold or reference any data managed by the data structure.
+- In this notes, i used this pattern in [doubly linked list](./linked-list/doubly-ll/main.go)
+
+```mermaid
+graph LR
+    subgraph "Empty List"
+        A1[HEAD<br/>Sentinel] -->|Next| A2[TAIL<br/>Sentinel]
+        A2 -->|Prev| A1
+    end
+```
+
+```mermaid
+graph LR
+ subgraph "After Adding Node 'A'"
+        B1[HEAD<br/>Sentinel] -->|Next| B2[Node A<br/>Data: 100]
+        B2 -->|Next| B3[TAIL<br/>Sentinel]
+        B3 -->|Prev| B2
+        B2 -->|Prev| B1
+    end
+```
+
+- **Benefits**:
+    - Simplifies code by eliminating edge cases (e.g., inserting into an empty list).
+    - Ensures that there are always nodes to reference, making operations like insertion and deletion more straightforward.

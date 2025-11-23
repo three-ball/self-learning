@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Service
+# Metadata for the Service
+metadata:
+  name: nginx-service
+# Specification of the Service
+spec:
+  selector:
+    app: nginx
+  ports:
+    - protocol: TCP
+      port: 80
+      targetPort: 8080
+# Status section, usually omitted in manifest files

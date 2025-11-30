@@ -208,3 +208,460 @@ spec:
 # Status section, usually omitted in manifest files
 
 ```
+
+## Playground
+
+### Before we start
+
+```
+> nano /etc/network/interfaces
+# ------------------------
+# This file describes the network interfaces available on your system
+# and how to activate them. For more information, see interfaces(5).
+
+source /etc/network/interfaces.d/*
+
+# The loopback network interface
+auto lo
+iface lo inet loopback
+
+# The primary network interface
+auto enp1s0
+iface enp1s0 inet static
+    address 192.168. 250.190
+    netmask 255.255.255.0
+    gateway 192.168.250.1
+    dns-nameservers 8.8.8.8 8.8.4.4
+# ------------------------
+    
+> systemctl restart networking
+```
+
+### **1\. Architecture**
+
+Useful links: [Guide](https://seifrajhi.github.io/blog/kubernetes-containerd-cilium-setup/); [Cilium](https://docs.cilium.io/en/stable/gettingstarted/k8s-install-default/#k8s-install-quick); [kubeadm](https://kubernetes.io/docs/setup/production-environment/tools/kubeadm/install-kubeadm/)
+
+**Pattern:** Stacked etcd HA Control Plane with External Load Balancer
+
+```mermaid
+graph TB
+    subgraph "Load Balancer Layer"
+        VIP[Virtual IP: 192.168.250.200:16443<br/>keepalived VRRP]
+        HAP1[haproxy<br/>node1]
+        HAP2[haproxy<br/>node2]
+        HAP3[haproxy<br/>node3]
+    end
+    
+    subgraph "Stacked Control Plane"
+        CP1[Control Plane Node 1<br/>API + etcd + scheduler + controller]
+        CP2[Control Plane Node 2<br/>API + etcd + scheduler + controller]
+        CP3[Control Plane Node 3<br/>API + etcd + scheduler + controller]
+    end
+    
+    subgraph "Networking"
+        CILIUM[Cilium CNI<br/>Pod networking + eBPF]
+    end
+    
+    CLIENT[kubectl / kubelet] -->|All requests| VIP
+    VIP -.VRRP election.-> HAP1
+    VIP -.standby.-> HAP2
+    VIP -.standby.-> HAP3
+    
+    HAP1 -->|roundrobin| CP1
+    HAP1 -->|roundrobin| CP2
+    HAP1 -->|roundrobin| CP3
+    
+    CP1 -.etcd raft cluster.-> CP2
+    CP2 -.etcd raft cluster.-> CP3
+    
+    CILIUM -.manages pod IPs.-> CP1
+    CILIUM -.manages pod IPs.-> CP2
+    CILIUM -.manages pod IPs.-> CP3
+    
+    style VIP fill:#FFD700
+    style HAP1 fill:#87CEEB
+    style CP1 fill:#90EE90
+    style CP2 fill:#90EE90
+    style CP3 fill:#90EE90
+```
+
+|     |     |     |
+| --- | --- | --- |
+| **Layer** | **Technology** | **Purpose** |
+| **VIP Failover** | keepalived (VRRP) | Provides floating IP that moves between nodes |
+| **Load Balancer** | haproxy | Distributes API requests across control planes |
+| **Control Plane** | kubeadm (stacked etcd) | API server, scheduler, controller-manager, etcd |
+| **CNI** | Cilium | Pod networking with eBPF |
+| **Consensus** | etcd (raft) | Distributed key-value store for cluster state |
+
+> `keepalived` VIP failover is network-layer only — add `vrrp_script` health checks to monitor application services (haproxy, API server, etc.), otherwise the VIP remains on a node even when services crash.
+> 
+> Beside HAProxy + keepalived, we can use other way like `kube-vip` or cloud load balancer.
+
+### **2\. Update & Upgrade**
+
+Update & upgrade
+
+```sh
+# simple update & upgrade
+sudo apt update -y && sudo apt upgrade -y
+```
+
+### **3\. Add New User for Operations**
+
+Add new users for operation task.
+
+```sh
+# add new user
+adduser devops
+usermod -aG sudo devops
+su devops && cd
+```
+
+### **4\. Turn Off Swap**
+
+Turn of swap: [**Why disable swap on kubernetes?**](https://serverfault.com/questions/881517/why-disable-swap-on-kubernetes); **Kubernetes requires swap to be disabled**. kubelet refuses to start if swap is enabled because it interferes with pod memory limits and scheduling decisions.
+
+```sh
+# disables swap immediately.
+sudo swapoff -a
+# sed commands comment out swap entries in /etc/fstab to persist across reboots.
+sudo sed -i '/swap.img/s/^/#/' /etc/fstab
+sudo sed -i '/ swap / s/^\(.*\)$/#\1/g' /etc/fstab
+```
+
+### **5\. Install Container Runtime (containerd)**
+
+*   Load kernel modules
+    *   `**overlay**`: Required for containerd's OverlayFS storage driver (efficient layered filesystems for containers).
+    *   `**br_netfilter**`: Enables iptables to see bridged network traffic (required for Kubernetes networking).\\
+
+```sh
+cat <<EOF | sudo tee /etc/modules-load.d/k8s.conf
+overlay
+br_netfilter
+EOF
+
+sudo modprobe overlay
+sudo modprobe br_netfilter
+```
+
+*   Configure sysctl parameters
+    *   `**bridge-nf-call-iptables/ip6tables**`: Ensures bridge traffic is processed by iptables (needed for pod networking).
+    *   `**ip_forward**`: Enables packet forwarding between network interfaces (required for routing pod traffic).
+    *   Persists across reboots via `**/etc/sysctl.d/**`.
+
+```sh
+# Configure required sysctl to persist across system reboots
+cat <<EOF | sudo tee /etc/sysctl.d/kubernetes.conf
+net.bridge.bridge-nf-call-iptables  = 1
+net.bridge.bridge-nf-call-ip6tables = 1
+net.ipv4.ip_forward                 = 1
+EOF
+sudo sysctl --system
+```
+
+*   Install `**containerd**` binary:  Installs containerd (the container runtime). Kubernetes uses containerd via CRI (Container Runtime Interface) to manage containers.
+
+```sh
+# Some neccessary tools
+sudo apt install -y curl gnupg2 software-properties-common apt-transport-https ca-certificates
+# Install binary
+wget https://github.com/containerd/containerd/releases/download/v2.0.0/containerd-2.0.0-linux-amd64.tar.gz
+tar -C /usr/local -xzvf containerd-2.0.0-linux-amd64.tar.gz
+```
+
+*   Configure `**SystemdCgroup**`: **SystemdCgroup** is a configuration option that tells **containerd** (or other container runtimes) to use systemd as the cgroup driver instead of the default `**cgroupfs**`. **cgroups (control groups) are a Linux kernel feature for limiting and isolating resource usage** (CPU, memory, I/O) for processes. **kubelet** and **containerd** must use the **same cgroup driver.** There are **two cgroup drivers**:
+    *   **cgroupfs** — direct cgroup manipulation (default in many runtimes)
+    *   **systemd** — uses systemd to manage cgroups (recommended for Kubernetes)
+
+```sh
+sudo mkdir -p /etc/containerd
+sudo containerd config default | sudo tee /etc/containerd/config.toml
+sudo sed -i 's/            SystemdCgroup = false/            SystemdCgroup = true/' /etc/containerd/config.toml
+```
+
+*   Create systemd service for containerd: Registers containerd as a systemd service so it starts on boot and can be managed with `**systemctl**`.
+
+```sh
+mkdir -p /usr/local/lib/systemd/system/
+cat <<EOF > /usr/local/lib/systemd/system/containerd.service
+[Unit]
+Description=containerd container runtime
+Documentation=https://containerd.io
+After=network.target local-fs.target dbus.service
+
+[Service]
+ExecStartPre=-/sbin/modprobe overlay
+ExecStart=/usr/local/bin/containerd
+
+Type=notify
+Delegate=yes
+KillMode=process
+Restart=always
+RestartSec=5
+
+LimitNPROC=infinity
+LimitCORE=infinity
+TasksMax=infinity
+OOMScoreAdjust=-999
+
+[Install]
+WantedBy=multi-user.target
+EOF
+systemctl daemon-reload
+systemctl enable --now containerd
+```
+
+### **6\. Install Kubernetes**
+
+*   **Add Kubernetes APT repository:**
+
+```sh
+sudo mkdir -p -m 755 /etc/apt/keyrings
+curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.34/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.34/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+sudo apt-get update
+```
+
+*   **Install**:
+    *   `**kubelet**`: Node agent that runs pods.
+    *   `**kubeadm**`: Tool to bootstrap the cluster.
+    *   `**kubectl**`: CLI to interact with Kubernetes API.
+
+```sh
+sudo apt-get install -y kubelet kubeadm kubectl
+# hold version, prevents accidental upgrades (cluster version must be upgraded carefully).
+sudo apt-mark hold kubelet kubeadm kubectl
+```
+
+*   **Install CNI Plugins:** CNI (Container Network Interface) plugins enable pod networking (e.g., IP assignment, routing). Required by Kubernetes networking solutions like Cilium.
+
+```sh
+wget https://github.com/containernetworking/plugins/releases/download/v1.6.0/cni-plugins-linux-amd64-v1.6.0.tgz
+mkdir -p /opt/cni/bin
+tar -C /opt/cni/bin -xzvf cni-plugins-linux-amd64-v1.6.0.tgz
+systemctl restart containerd
+```
+
+### **7\. Install keepalived & HAProxy**
+
+Install from apt:
+
+```sh
+sudo apt install -y keepalived haproxy
+```
+
+Configure `keepalived`: We will setup keepalived with VRRP to provide a floating VIP (Virtual IP Address) for high availability. Note that we add a `vrrp_script` to monitor the health of haproxy service. If haproxy fails, keepalived will lower the priority of the node, causing a failover of the VIP to another healthy node.
+
+*   **For cluster/master 1:**
+
+```sh
+sudo tee /etc/keepalived/keepalived.conf > /dev/null <<EOF
+vrrp_script check_haproxy {
+    script "killall -0 haproxy"
+    interval 3
+    weight -51
+    fall 10
+    rise 2
+}
+
+vrrp_instance VI_1 {
+    state MASTER
+    interface enp1s0
+    virtual_router_id 51
+    priority 250
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+    virtual_ipaddress {
+        192.168.250.200
+    }
+    track_script {
+        check_haproxy
+    }
+}
+EOF
+
+sudo systemctl restart keepalived
+sudo systemctl enable keepalived
+sudo systemctl status keepalived
+
+# root@vienct3-master-01:~# sudo journalctl -u keepalived.service -f
+# -- Journal begins at Wed 2025-11-26 08:51:12 PST. --
+# Nov 30 07:30:30 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) received lower priority (200) advert from 192.168.250.191 - discarding
+# Nov 30 07:30:31 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) received lower priority (200) advert from 192.168.250.191 - discarding
+# Nov 30 07:30:32 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) received lower priority (200) advert from 192.168.250.191 - discarding
+# Nov 30 07:30:32 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) Entering MASTER STATE
+# Nov 30 07:31:09 vienct3-master-01 Keepalived_vrrp[6146]: Script `check_haproxy` now returning 1
+# Nov 30 07:31:36 vienct3-master-01 Keepalived_vrrp[6146]: VRRP_Script(check_haproxy) failed (exited with status 1)
+# Nov 30 07:31:36 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) Changing effective priority from 250 to 199
+# Nov 30 07:31:39 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) Master received advert from 192.168.250.191 with higher priority 200, ours 199
+# Nov 30 07:31:39 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) Entering BACKUP STATE
+# Nov 30 07:34:15 vienct3-master-01 Keepalived_vrrp[6146]: Script `check_haproxy` now returning 0
+# Nov 30 07:34:18 vienct3-master-01 Keepalived_vrrp[6146]: VRRP_Script(check_haproxy) succeeded
+# Nov 30 07:34:18 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) Changing effective priority from 199 to 250
+# Nov 30 07:34:19 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) received lower priority (200) advert from 192.168.250.191 - discarding
+# Nov 30 07:34:20 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) received lower priority (200) advert from 192.168.250.191 - discarding
+# Nov 30 07:34:21 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) received lower priority (200) advert from 192.168.250.191 - discarding
+# Nov 30 07:34:21 vienct3-master-01 Keepalived_vrrp[6146]: (VI_1) Entering MASTER STATE
+```
+
+
+
+*   **For cluster/master 2-3:** Priority is lower than master 1, should match the `vrrp_script` configuration above to failover if haproxy fails.
+
+```sh
+# master 2
+sudo tee /etc/keepalived/keepalived.conf > /dev/null <<EOF
+vrrp_script check_haproxy {
+    script "killall -0 haproxy"
+    interval 3
+    weight -51
+    fall 10
+    rise 2
+}
+
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface enp1s0
+    virtual_router_id 51
+    priority 200
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+    virtual_ipaddress {
+        192.168.250.200
+    }
+    track_script {
+        check_haproxy
+    }
+}
+EOF
+
+# master 3
+sudo tee /etc/keepalived/keepalived.conf > /dev/null <<EOF
+vrrp_script check_haproxy {
+    script "killall -0 haproxy"
+    interval 3
+    weight -51
+    fall 10
+    rise 2
+}
+
+vrrp_instance VI_1 {
+    state BACKUP
+    interface enp1s0
+    virtual_router_id 51
+    priority 150
+    advert_int 1
+    authentication {
+        auth_type PASS
+        auth_pass 1234
+    }
+    virtual_ipaddress {
+        192.168.250.200
+    }
+    track_script {
+        check_haproxy
+    }
+}
+EOF
+
+sudo systemctl restart keepalived
+sudo systemctl enable keepalived
+sudo systemctl status keepalived
+```
+
+Configure `haproxy`:
+
+```sh
+sudo tee /etc/haproxy/haproxy.cfg > /dev/null <<EOF
+global
+    log /dev/log local0
+    log /dev/log local1 notice
+    chroot /var/lib/haproxy
+    stats socket /run/haproxy/admin.sock mode 660 level admin
+    stats timeout 30s
+    user haproxy
+    group haproxy
+    daemon
+    maxconn 4096
+
+defaults
+    log     global
+    mode    tcp
+    option  tcplog
+    option  dontlognull
+    timeout connect 5s
+    timeout client  50s
+    timeout server  50s
+    retries 3
+
+frontend kubernetes-api-server
+    bind *:16443
+    mode tcp
+    option tcplog
+    default_backend kubernetes-api-server
+
+backend kubernetes-api-server
+    mode tcp
+    balance roundrobin
+
+    server vienct3-master-01 192.168.250.190:6443 check
+    server vienct3-master-02 192.168.250.191:6443 check
+    server vienct3-master-03 192.168.250.193:6443 check 
+EOF
+sudo systemctl restart haproxy.service
+sudo systemctl enable haproxy.service
+sudo systemctl status haproxy.service
+```
+
+### **8\. Init Control Plane**
+
+*   Initialize the Control Plane:
+    *   `**--control-plane-endpoint**`: Sets a stable endpoint for HA setups (allows multiple control planes behind a load balancer).
+    *   `**--upload-certs:**` Uploads control plane certs to Kubernetes Secrets for joining additional control plane nodes.
+
+```sh
+sudo kubeadm init \
+  --control-plane-endpoint "192.168.250.200:6443" \
+  --upload-certs
+```
+
+*   Copy kubectl configure file:  Copies the admin kubeconfig to your user directory so kubectl can authenticate to the API server.
+
+```sh
+# cp kubectl
+mkdir -p $HOME/.kube
+sudo cp -i /etc/kubernetes/admin.conf $HOME/.kube/config
+sudo chown $(id -u):$(id -g) $HOME/.kube/config
+```
+
+*   Reset cluster if something error:
+
+```
+sudo kubeadm reset -f
+sudo rm -rf /etc/kubernetes /var/lib/etcd /var/lib/kubelet /etc/cni/net.d
+sudo systemctl restart containerd
+```
+
+### **9\. Install Cilium CNI**
+
+```sh
+# Cilium install
+CILIUM_CLI_VERSION=$(curl -s https://raw.githubusercontent.com/cilium/cilium-cli/main/stable.txt)
+CLI_ARCH=amd64
+if [ "$(uname -m)" = "aarch64" ]; then CLI_ARCH=arm64; fi
+curl -L --fail --remote-name-all https://github.com/cilium/cilium-cli/releases/download/${CILIUM_CLI_VERSION}/cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+sha256sum --check cilium-linux-${CLI_ARCH}.tar.gz.sha256sum
+sudo tar xzvfC cilium-linux-${CLI_ARCH}.tar.gz /usr/local/bin
+rm cilium-linux-${CLI_ARCH}.tar.gz{,.sha256sum}
+cilium install --version 1.18.4
+cilium status --wait
+```

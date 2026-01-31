@@ -1,4 +1,4 @@
-# ACID - CRQS - CAP - CAPELC
+# ACID - CQRS - CAP - PCAELC
 
 ## ACID
 
@@ -65,7 +65,7 @@ mindmap
 
 * `Durability` ensures that once a transaction is committed, **its changes are permanently saved, even if the system fails**.
 
-## CRQS
+## CQRS
 
 ```mermaid
 flowchart LR
@@ -76,4 +76,35 @@ flowchart LR
     WriteDB -->|Eventual Consistency| ReadDB
 ```
 
-* CRQS stands for `Command`, `Read`, `Query`, `Separation`.
+* CQRS stands for `Command Query Responsibility Segregation`.
+* It is a design pattern that separates the read and write operations of a data store into different models.
+* **CQRS often goes hand-in-hand with Event Sourcing**, where state changes are stored as a sequence of events. [Event sourcing, CQRS, stream processing and Apache Kafka: What’s the connection?](https://www.confluent.io/blog/event-sourcing-cqrs-stream-processing-apache-kafka-whats-connection/)
+
+![CQRS Diagram](images/03_confluent_cqrs.jpeg)
+
+## CAP Theorem
+
+![CAP Theorem](images/03_cap_theorem.png)
+
+* CAP stands for `Consistency`, `Availability`, `Partition Tolerance`.
+* CAP theorem states that in a distributed data store, you can only achieve two out of the three guarantees at the same time.
+* CA only works in non-distributed systems (when all data is stored on a single node), but in practice, distributed systems must handle network partitions, so CP and AP are the more relevant trade-offs.
+* Banking, financial systems often prioritize Consistency and Partition Tolerance (CP) to ensure accurate transactions, while social media platforms may prioritize Availability and Partition Tolerance (AP) to ensure users can always access content, even if some data is temporarily inconsistent.
+
+## PCAELC
+
+```mermaid
+mindmap
+  root((PCAELC))
+    Partition_Tolerance
+      Yes
+        Consistency
+        Availability
+      No
+        Latency
+        Consistency
+```
+
+* PACELC theorem is an extension of the CAP theorem that adds considerations for latency during normal operation (when there are no network partitions).
+* It states that in the event of a network partition (P), a distributed system must choose between Consistency (C) and Availability (A). Else (E), when the system is running normally, it must choose between Latency (L) and Consistency (C).
+* The trade-offs between "Latency" and "Consistency" during normal operation depend on the specific requirements of the application. When we need low latency, we might accept some level of eventual consistency. Conversely, if strong consistency is crucial, we might tolerate higher latency due to synchronization overhead.

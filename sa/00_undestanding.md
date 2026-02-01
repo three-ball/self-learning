@@ -46,3 +46,8 @@ It answers questions such as:
 * How do they interact with each other?
 
 > **Architecture is design, but not all design is architecture.**
+
+## Awesome Resources
+
+* [Introduction To Microservices - Chris Richardson](https://www.f5.com/company/blog/nginx/introduction-to-microservices)
+* [Event sourcing, CQRS, stream processing and Apache Kafka: What's the connection?](https://www.confluent.io/blog/event-sourcing-cqrs-stream-processing-apache-kafka-whats-connection/)

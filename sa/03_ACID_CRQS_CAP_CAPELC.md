@@ -78,7 +78,7 @@ flowchart LR
 
 * CQRS stands for `Command Query Responsibility Segregation`.
 * It is a design pattern that separates the read and write operations of a data store into different models.
-* **CQRS often goes hand-in-hand with Event Sourcing**, where state changes are stored as a sequence of events. [Event sourcing, CQRS, stream processing and Apache Kafka: What’s the connection?](https://www.confluent.io/blog/event-sourcing-cqrs-stream-processing-apache-kafka-whats-connection/)
+* **CQRS often goes hand-in-hand with Event Sourcing**, where state changes are stored as a sequence of events. 
 
 ![CQRS Diagram](images/03_confluent_cqrs.jpeg)
 
